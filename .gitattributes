@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+*.py    text diff=python
+*.md    text
+*.yaml  text
+*.yml   text
+*.toml  text
+*.ts    text
+*.json  text
+
+pixi.lock       linguist-generated=true merge=binary
+viewer/pnpm-lock.yaml linguist-generated=true merge=binary
+CHANGELOG.md    linguist-generated=true
+
+# Fixtures are binary; never try to merge or diff them.
+tests/fixtures/**/*.laz binary
+tests/fixtures/**/*.las binary
+tests/fixtures/**/*.gml text

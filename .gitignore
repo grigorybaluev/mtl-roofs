@@ -1,0 +1,49 @@
+# ------------------------------------------------------------------ data
+# Raw, interim and derived data never enter git. The only exception is
+# tests/fixtures/, which holds tiny clips committed deliberately (< 2 MB each).
+data/*
+!data/manifest.yaml
+*.laz
+*.las
+*.gml
+*.tif
+*.tiff
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.b3dm
+*.pnts
+*.glb
+*.gltf
+tileset.json
+!tests/fixtures/**
+
+# ------------------------------------------------------------- environments
+.pixi/
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+
+# ---------------------------------------------------------------- artefacts
+dist/
+build/
+*.egg-info/
+viewer/dist/
+.eval-smoke/
+coverage.xml
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# --------------------------------------------------------------------- local
+.env
+.DS_Store
+*.swp
+.idea/
+.vscode/
