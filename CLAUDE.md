@@ -56,6 +56,8 @@ mtl-roofs version
 mtl-roofs data areas              # study areas in configs/areas/
 mtl-roofs data plan  -a <area>    # what would be downloaded, no download
 mtl-roofs data fetch -a <area>    # stream + verify only the needed tiles
+mtl-roofs data verify -a <area>   # re-check local artefacts offline, no network
+mtl-roofs data checksums -a <area>  # print the YAML to paste into data/manifest.yaml
 mtl-roofs reconstruct -a <area>
 mtl-roofs evaluate    -a <area>
 mtl-roofs export      -a <area>
@@ -85,6 +87,12 @@ mtl-roofs report      -a <area>
 - Any new source goes in `data/manifest.yaml` (URL, size, SHA-256) **and**
   `docs/data-sources.md` (licence, CRS, coverage, date retrieved, pitfalls) in the
   same PR.
+- **Pinning a checksum is a human act.** `data checksums` prints the YAML; you paste
+  it after satisfying yourself the download is good. Nothing writes to the manifest
+  automatically, because a tool that pinned whatever it just downloaded would certify
+  a corrupt file exactly as confidently as a good one.
+- Checksums are taken over the **artefact that lands in `data/raw/`**, never the
+  enclosing archive — the LiDAR archives are 20–28 GB and are never fetched whole.
 - Verify facts about external data against the source, never from a description.
   The project brief asserted EPSG:32188; the data says **2950**.
 

@@ -21,6 +21,7 @@ import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import IO
 from urllib.request import Request, urlopen
 
 #: Signature of a ZIP64 "end of central directory" record.
@@ -41,6 +42,15 @@ _DEFLATED = 8
 
 class RemoteZipError(RuntimeError):
     """The remote archive could not be read as a ZIP over range requests."""
+
+
+class TruncatedMemberError(RemoteZipError):
+    """A member's decompressed stream ended early, or ran long.
+
+    Raised when the number of bytes recovered does not match the size the archive's
+    own central directory declares. This catches a dropped connection even when the
+    member has no pinned checksum yet.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +167,19 @@ class RemoteZip:
         name_len, extra_len = struct.unpack_from("<HH", head, 26)
         return member.header_offset + 30 + int(name_len) + int(extra_len)
 
+    def _open_range(self, start: int, end: int) -> IO[bytes]:
+        """Open a streaming response over the inclusive byte range ``[start, end]``.
+
+        Split out from :meth:`_stream` so that tests can serve an archive from a
+        local buffer without any network.
+        """
+        req = Request(
+            self.url,
+            headers={"User-Agent": self.user_agent, "Range": f"bytes={start}-{end}"},
+        )
+        stream: IO[bytes] = urlopen(req, timeout=self.timeout)
+        return stream
+
     def open_member(self, member: ZipMember, chunk_size: int = 1 << 20) -> bytes:
         """Fetch and decompress an entire member into memory.
 
@@ -180,8 +203,15 @@ class RemoteZip:
         """
         dest.parent.mkdir(parents=True, exist_ok=True)
         tmp = dest.with_suffix(dest.suffix + ".part")
-        with tmp.open("wb") as handle:
-            self._stream(member, handle.write, chunk_size)
+        try:
+            with tmp.open("wb") as handle:
+                self._stream(member, handle.write, chunk_size)
+        except BaseException:
+            # Never leave a partial file where a later run would mistake it for a
+            # complete download. This includes KeyboardInterrupt, which is exactly
+            # how a multi-hundred-megabyte fetch tends to die.
+            tmp.unlink(missing_ok=True)
+            raise
         tmp.replace(dest)
         return dest
 
@@ -191,24 +221,36 @@ class RemoteZip:
         sink: Callable[[bytes], object],
         chunk_size: int,
     ) -> None:
-        """Pull a member's bytes and push the decompressed stream into ``sink``."""
+        """Pull a member's bytes and push the decompressed stream into ``sink``.
+
+        Raises:
+            TruncatedMemberError: if the recovered byte count disagrees with the
+                size declared in the central directory.
+        """
         if member.method not in (_STORED, _DEFLATED):
             msg = f"unsupported compression method {member.method} for {member.name}"
             raise RemoteZipError(msg)
         start = self._data_offset(member)
-        req = Request(
-            self.url,
-            headers={
-                "User-Agent": self.user_agent,
-                "Range": f"bytes={start}-{start + member.compressed_size - 1}",
-            },
-        )
         decomp = zlib.decompressobj(-zlib.MAX_WBITS) if member.is_deflated else None
-        with urlopen(req, timeout=self.timeout) as resp:
+        written = 0
+
+        def emit(data: bytes) -> None:
+            nonlocal written
+            written += len(data)
+            sink(data)
+
+        with self._open_range(start, start + member.compressed_size - 1) as resp:
             while chunk := resp.read(chunk_size):
-                sink(decomp.decompress(chunk) if decomp else chunk)
+                emit(decomp.decompress(chunk) if decomp else chunk)
         if decomp is not None:
-            sink(decomp.flush())
+            emit(decomp.flush())
+
+        if written != member.uncompressed_size:
+            msg = (
+                f"{member.name}: recovered {written} bytes but the archive declares "
+                f"{member.uncompressed_size}"
+            )
+            raise TruncatedMemberError(msg)
 
 
 def parse_central_directory(raw: bytes) -> list[ZipMember]:
