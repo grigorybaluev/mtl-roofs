@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # pixi is NOT covered by Dependabot; .github/workflows/lock-update.yml handles it.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies", "type:chore", "area:ci"]
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions-minor:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: npm
+    directory: "/viewer"
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies", "type:chore", "area:viewer"]
+    commit-message:
+      prefix: "chore(viewer)"
+    groups:
+      npm-minor:
+        update-types: ["minor", "patch"]

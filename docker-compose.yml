@@ -1,0 +1,27 @@
+# PostGIS for local development. There is no local PostgreSQL install:
+# see CLAUDE.md for why (macOS 12 Intel has no Homebrew bottles).
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: mtl-roofs-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mtl_roofs}
+      POSTGRES_USER: ${POSTGRES_USER:-mtl_roofs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mtl_roofs}
+      # Montreal data is all EPSG:2950; keep the server locale predictable.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mtl_roofs} -d ${POSTGRES_DB:-mtl_roofs}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  pgdata:

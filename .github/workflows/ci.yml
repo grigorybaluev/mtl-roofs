@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: lint · typecheck · test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: prefix-dev/setup-pixi@v0
+        with:
+          # Install exactly what pixi.lock pins: CI and local must not diverge.
+          locked: true
+          cache: true
+          environments: default
+
+      - name: Lint
+        run: pixi run lint
+
+      - name: Typecheck
+        run: pixi run typecheck
+
+      - name: Unit tests
+        run: pixi run test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo '### Coverage' >> "$GITHUB_STEP_SUMMARY"
+          pixi run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          p = Path("coverage.xml")
+          if not p.exists():
+              print("no coverage.xml produced")
+          else:
+              root = ET.parse(p).getroot()
+              rate = float(root.get("line-rate", 0)) * 100
+              branch = float(root.get("branch-rate", 0)) * 100
+              print(f"- line coverage: **{rate:.1f}%**")
+              print(f"- branch coverage: **{branch:.1f}%**")
+          PY

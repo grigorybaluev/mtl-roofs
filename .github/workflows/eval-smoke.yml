@@ -1,0 +1,84 @@
+# The project's regression guard. Runs the pipeline over the committed fixtures and
+# fails if a headline metric moves beyond the tolerance stored alongside the
+# baseline. Evaluation is sacred: see CLAUDE.md and docs/evaluation.md.
+name: eval-smoke
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/fixtures/**"
+      - ".github/workflows/eval-smoke.yml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: eval-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: metrics vs baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: prefix-dev/setup-pixi@v0
+        with:
+          locked: true
+          cache: true
+          environments: default
+
+      - name: Guard the baseline
+        # An algorithm change and a baseline change in one PR cannot be reviewed,
+        # because the two effects are not separable. Fail loudly rather than warn.
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          git fetch --no-tags --depth=50 origin "$base" || true
+          changed=$(git diff --name-only "$base" "$head" || true)
+          touched_baseline=$(echo "$changed" | grep -c 'tests/fixtures/baseline_metrics.json' || true)
+          touched_algo=$(echo "$changed" | grep -cE 'src/mtl_roofs/(geometry|evaluation|ml)/' || true)
+          if [ "$touched_baseline" -gt 0 ] && [ "$touched_algo" -gt 0 ]; then
+            echo "::error::This PR changes baseline_metrics.json AND algorithm code."
+            echo "::error::Baseline updates are their own PR, with justification."
+            exit 1
+          fi
+
+      - name: Run the smoke evaluation
+        id: smoke
+        continue-on-error: true
+        run: pixi run eval-smoke
+
+      - name: Comment the metric table
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.eval-smoke/report.md';
+            const body = fs.existsSync(path)
+              ? fs.readFileSync(path, 'utf8')
+              : '### eval-smoke\n\n:construction: The smoke evaluation did not produce a report yet. '
+                + 'The pipeline is still being implemented; this gate becomes enforcing once '
+                + '`mtl-roofs evaluate --smoke` is wired up.';
+            const marker = '<!-- eval-smoke -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const existing = (await github.rest.issues.listComments({ owner, repo, issue_number }))
+              .data.find(c => c.body.includes(marker));
+            const payload = `${marker}\n${body}`;
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: payload });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: payload });
+            }
+
+      - name: Fail on regression
+        if: steps.smoke.outcome == 'failure'
+        run: |
+          echo "::error::A headline metric regressed beyond tolerance, or eval-smoke errored."
+          exit 1

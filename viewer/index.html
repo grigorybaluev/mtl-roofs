@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mtl-roofs — LOD2 roof reconstruction for Montréal</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene"></canvas>
+      <aside id="panel">
+        <h1>mtl-roofs</h1>
+        <p class="sub">LOD2 roof reconstruction · CDN–NDG</p>
+        <fieldset id="layers">
+          <legend>Layers</legend>
+          <label><input type="checkbox" data-layer="points" checked /> LiDAR points</label>
+          <label><input type="checkbox" data-layer="reconstruction" checked /> Reconstruction</label>
+          <label><input type="checkbox" data-layer="reference" /> Reference model</label>
+          <label><input type="checkbox" data-layer="error" /> Error colouring</label>
+        </fieldset>
+        <div id="metrics" class="empty">Select a building to see its metrics.</div>
+        <footer>
+          Data © Ville de Montréal, CC BY 4.0.
+          Portions © Communauté métropolitaine de Montréal.
+        </footer>
+      </aside>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

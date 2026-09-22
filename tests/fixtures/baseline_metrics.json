@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "Baseline for the eval-smoke regression guard.",
+    "Metric values are null until `mtl-roofs evaluate --smoke` is implemented; the",
+    "guard reports but does not gate while they are null. Populating them is part of",
+    "the 'Building matching + vertical RMSE' issue.",
+    "CHANGING THIS FILE IS ITS OWN PULL REQUEST. eval-smoke.yml fails any PR that",
+    "edits it alongside code in src/mtl_roofs/{geometry,evaluation,ml}/."
+  ],
+  "fixture_set": {
+    "n_buildings": 20,
+    "lidar_tile": "292-5035",
+    "reference_tile": "CDNNDG03",
+    "crs": "EPSG:2950"
+  },
+  "tolerances": {
+    "_comment": "Max allowed worsening before eval-smoke fails. RANSAC is seeded but seeds do not survive refactors.",
+    "vertical_rmse_m": 0.02,
+    "orientation_error_median_deg": 0.5,
+    "coverage": -0.01,
+    "match_rate": -0.01,
+    "buildings_reconstructed": 0
+  },
+  "metrics": {
+    "overall": {
+      "vertical_rmse_m": null,
+      "orientation_error_median_deg": null,
+      "orientation_error_p90_deg": null,
+      "coverage": null,
+      "face_count_agreement": null,
+      "match_rate": null,
+      "buildings_reconstructed": null
+    },
+    "by_roof_type": {
+      "flat": {
+        "n": 5,
+        "vertical_rmse_m": null,
+        "orientation_error_median_deg": null,
+        "coverage": null
+      },
+      "mixed": {
+        "n": 5,
+        "vertical_rmse_m": null,
+        "orientation_error_median_deg": null,
+        "coverage": null
+      },
+      "pitched": {
+        "n": 6,
+        "vertical_rmse_m": null,
+        "orientation_error_median_deg": null,
+        "coverage": null
+      },
+      "complex": {
+        "n": 4,
+        "vertical_rmse_m": null,
+        "orientation_error_median_deg": null,
+        "coverage": null
+      }
+    }
+  }
+}

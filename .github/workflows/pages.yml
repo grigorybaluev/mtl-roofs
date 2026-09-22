@@ -1,0 +1,64 @@
+# Deploys the viewer to GitHub Pages. Data products are built locally and attached
+# to a release; CI never runs the full pipeline, so this job only bundles.
+name: pages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: viewer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: viewer/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Attach the tileset from the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist/tiles
+          # The tileset is a release asset because it is far too large for git.
+          # A release without one still deploys: the viewer shows its empty state.
+          if gh release download --repo "$GITHUB_REPOSITORY" --pattern 'tileset-*.zip' --dir /tmp 2>/dev/null; then
+            unzip -q /tmp/tileset-*.zip -d dist/tiles
+            echo "tileset bundled"
+          else
+            echo "::warning::No tileset asset on the latest release; deploying the viewer without data."
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: viewer/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

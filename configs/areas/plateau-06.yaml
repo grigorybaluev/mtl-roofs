@@ -1,0 +1,16 @@
+# Flat-roof control area. 95.7% of buildings are flat, so this is a poor primary
+# study area but a useful contrast in the evaluation write-up, and a v1 scale test.
+name: plateau-06
+borough: Le Plateau-Mont-Royal
+description: >-
+  Reference-model tile PMR06. 398 buildings, 95.7% flat / 3.0% mixed / 1.3% pitched.
+  Needs six LiDAR tiles (1393 MB) spanning two bulk archives.
+epsg: 2950
+bbox:
+  xmin: 298998.15625
+  ymin: 5043906.5
+  xmax: 300093.53125
+  ymax: 5044562.5
+reference_tiles:
+  - PMR06
+expected_buildings: 398

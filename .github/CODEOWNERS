@@ -1,0 +1,9 @@
+# Everything is owned by the maintainer. Solo repo: this exists so that reviews are
+# requested automatically and ownership survives the project being handed on.
+* @grigorybaluev
+
+# The evaluation contract is the point of the project; changes here get extra scrutiny.
+/docs/evaluation.md            @grigorybaluev
+/tests/fixtures/baseline_metrics.json @grigorybaluev
+/src/mtl_roofs/evaluation/     @grigorybaluev
+/docs/adr/                     @grigorybaluev

@@ -1,0 +1,16 @@
+# Alternative v0 area, kept for comparison. Most geometrically complex roofs of the
+# three candidates (35.1 roof polygons per building) and strong relief (Z 75-174 m).
+name: outremont-01
+borough: Outremont
+description: >-
+  Reference-model tile O01. 581 buildings, 43.9% pitched / 26.3% mixed / 29.8% flat.
+  Needs six LiDAR tiles (1823 MB).
+epsg: 2950
+bbox:
+  xmin: 295740.375
+  ymin: 5040986.0
+  xmax: 297708.03125
+  ymax: 5041789.5
+reference_tiles:
+  - O01
+expected_buildings: 581

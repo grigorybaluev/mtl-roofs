@@ -1,0 +1,56 @@
+# Dependabot does not understand pixi, so the conda lockfile is refreshed here.
+name: lock-update
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: lock-update
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: prefix-dev/setup-pixi@v0
+        with:
+          # Deliberately not locked: the point of this job is to move the lock.
+          run-install: false
+
+      - name: pixi update
+        run: pixi update
+
+      - name: Verify the updated lock still works
+        run: |
+          pixi install --locked
+          pixi run lint
+          pixi run typecheck
+          pixi run test
+
+      - uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/pixi-lock-update
+          delete-branch: true
+          title: "chore(deps): update pixi.lock"
+          commit-message: "chore(deps): update pixi.lock"
+          labels: |
+            dependencies
+            type:chore
+            area:infra
+          body: |
+            Weekly `pixi update`. Lint, typecheck and unit tests were run against the
+            updated lockfile before this PR was opened.
+
+            Check the diff for anything that crosses a major version, and for any
+            `osx-64` package that raises its macOS floor above 12.0 — the development
+            machine is macOS 12 Monterey and would stop working.

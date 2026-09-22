@@ -1,0 +1,32 @@
+# Gentle nudging only. Nothing is ever auto-closed, and anything attached to a
+# milestone is left alone entirely: a stale roadmap item is still a roadmap item.
+name: stale
+
+on:
+  schedule:
+    - cron: "37 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/stale@v9
+        with:
+          only-labels: "needs-decision,blocked"
+          exempt-all-milestones: true
+          days-before-stale: 30
+          days-before-close: -1
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-label: stale
+          stale-issue-message: >
+            This has been waiting on a decision or unblocking for 30 days.
+            If the decision is still open, say what it is waiting on; if it is
+            resolved, write the ADR and drop the `needs-decision` label.
+            Nothing here will be closed automatically.

@@ -1,0 +1,7 @@
+# pnpm >= 10 refuses to run dependency lifecycle scripts unless they are approved
+# here, and errors out rather than skipping them silently. esbuild's postinstall
+# fetches the platform binary that vite builds with.
+packages:
+  - "."
+allowBuilds:
+  esbuild: true

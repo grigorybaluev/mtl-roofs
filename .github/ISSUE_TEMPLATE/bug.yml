@@ -1,0 +1,52 @@
+name: Bug
+description: Something behaves incorrectly.
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: >
+        Study area and specific building IDs, plus the exact command. A bug report
+        without building IDs is usually not reproducible in this project.
+      value: |
+        Study area:
+        Building IDs:
+        Command:
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS and architecture, `pixi --version`, and whether PostGIS was running.
+      value: |
+        OS / arch:
+        pixi:
+        Docker / PostGIS:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      render: shell
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [ingest, geometry, evaluation, ml, export, viewer, infra, ci]
+    validations:
+      required: true

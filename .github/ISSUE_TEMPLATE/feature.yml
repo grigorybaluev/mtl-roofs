@@ -1,0 +1,53 @@
+name: Feature
+description: A new capability or an improvement to an existing one.
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is not possible today, and who is blocked by it.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: >
+        How you intend to solve it. If there is a real alternative someone could
+        reasonably prefer, say so — it needs an ADR and the `needs-decision` label.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Concrete and checkable. "Works well" is not a criterion.
+      value: |
+        - [ ]
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - ingest
+        - geometry
+        - evaluation
+        - ml
+        - export
+        - viewer
+        - infra
+        - ci
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: ["p0 — blocks the milestone", "p1 — needed for the milestone", "p2 — nice to have"]
+    validations:
+      required: true

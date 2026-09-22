@@ -1,0 +1,371 @@
+{
+  "source": {
+    "lidar_tile": "292-5035",
+    "reference_tile": "CDNNDG03",
+    "study_area": "cdn-ndg-03",
+    "crs": "EPSG:2950",
+    "vertical_datum": "CGVD28"
+  },
+  "buildings": [
+    {
+      "building_id": "3322085",
+      "roof_type": "pitched",
+      "reference_faces": 5,
+      "reference_roof_area_m2": 71.9,
+      "reference_mean_slope_deg": 30.54,
+      "reference_steep_fraction": 1.0,
+      "bbox": [
+        292974.43,
+        5035756.7,
+        292984.92,
+        5035767.79
+      ],
+      "n_points": 6340,
+      "n_points_class6": 2485,
+      "point_density": 29.01,
+      "laz_bytes": 63458
+    },
+    {
+      "building_id": "3322002",
+      "roof_type": "pitched",
+      "reference_faces": 12,
+      "reference_roof_area_m2": 85.6,
+      "reference_mean_slope_deg": 26.35,
+      "reference_steep_fraction": 0.994,
+      "bbox": [
+        292791.39,
+        5035729.76,
+        292803.21,
+        5035741.71
+      ],
+      "n_points": 5210,
+      "n_points_class6": 2100,
+      "point_density": 20.64,
+      "laz_bytes": 52113
+    },
+    {
+      "building_id": "3322284",
+      "roof_type": "pitched",
+      "reference_faces": 26,
+      "reference_roof_area_m2": 98.7,
+      "reference_mean_slope_deg": 22.28,
+      "reference_steep_fraction": 0.772,
+      "bbox": [
+        292917.08,
+        5035707.29,
+        292929.45,
+        5035719.91
+      ],
+      "n_points": 7738,
+      "n_points_class6": 3493,
+      "point_density": 28.45,
+      "laz_bytes": 77184
+    },
+    {
+      "building_id": "3321697",
+      "roof_type": "pitched",
+      "reference_faces": 39,
+      "reference_roof_area_m2": 106.7,
+      "reference_mean_slope_deg": 37.78,
+      "reference_steep_fraction": 0.911,
+      "bbox": [
+        292745.45,
+        5035478.73,
+        292757.04,
+        5035492.11
+      ],
+      "n_points": 6866,
+      "n_points_class6": 2045,
+      "point_density": 25.33,
+      "laz_bytes": 69824
+    },
+    {
+      "building_id": "3321594",
+      "roof_type": "pitched",
+      "reference_faces": 21,
+      "reference_roof_area_m2": 120.4,
+      "reference_mean_slope_deg": 24.53,
+      "reference_steep_fraction": 0.906,
+      "bbox": [
+        292871.91,
+        5035681.63,
+        292887.82,
+        5035695.46
+      ],
+      "n_points": 9396,
+      "n_points_class6": 4150,
+      "point_density": 26.47,
+      "laz_bytes": 93897
+    },
+    {
+      "building_id": "3322143",
+      "roof_type": "pitched",
+      "reference_faces": 31,
+      "reference_roof_area_m2": 143.7,
+      "reference_mean_slope_deg": 27.37,
+      "reference_steep_fraction": 0.639,
+      "bbox": [
+        292720.95,
+        5035929.59,
+        292735.66,
+        5035945.64
+      ],
+      "n_points": 5907,
+      "n_points_class6": 1674,
+      "point_density": 15.74,
+      "laz_bytes": 54988
+    },
+    {
+      "building_id": "3322132",
+      "roof_type": "mixed",
+      "reference_faces": 24,
+      "reference_roof_area_m2": 62.7,
+      "reference_mean_slope_deg": 4.21,
+      "reference_steep_fraction": 0.112,
+      "bbox": [
+        292839.48,
+        5035867.59,
+        292849.6,
+        5035879.54
+      ],
+      "n_points": 8547,
+      "n_points_class6": 5189,
+      "point_density": 37.96,
+      "laz_bytes": 89374
+    },
+    {
+      "building_id": "3321560",
+      "roof_type": "mixed",
+      "reference_faces": 8,
+      "reference_roof_area_m2": 86.1,
+      "reference_mean_slope_deg": 15.21,
+      "reference_steep_fraction": 0.136,
+      "bbox": [
+        292858.15,
+        5035645.05,
+        292869.93,
+        5035658.56
+      ],
+      "n_points": 7887,
+      "n_points_class6": 2295,
+      "point_density": 28.55,
+      "laz_bytes": 82557
+    },
+    {
+      "building_id": "3321999",
+      "roof_type": "mixed",
+      "reference_faces": 39,
+      "reference_roof_area_m2": 111.3,
+      "reference_mean_slope_deg": 14.42,
+      "reference_steep_fraction": 0.52,
+      "bbox": [
+        292761.79,
+        5035743.51,
+        292776.59,
+        5035756.16
+      ],
+      "n_points": 3809,
+      "n_points_class6": 1697,
+      "point_density": 12.17,
+      "laz_bytes": 35899
+    },
+    {
+      "building_id": "3321611",
+      "roof_type": "mixed",
+      "reference_faces": 18,
+      "reference_roof_area_m2": 125.6,
+      "reference_mean_slope_deg": 2.88,
+      "reference_steep_fraction": 0.111,
+      "bbox": [
+        292910.39,
+        5035475.37,
+        292928.31,
+        5035489.88
+      ],
+      "n_points": 4609,
+      "n_points_class6": 2400,
+      "point_density": 11.36,
+      "laz_bytes": 43213
+    },
+    {
+      "building_id": "3321923",
+      "roof_type": "mixed",
+      "reference_faces": 31,
+      "reference_roof_area_m2": 142.8,
+      "reference_mean_slope_deg": 5.11,
+      "reference_steep_fraction": 0.108,
+      "bbox": [
+        292697.7,
+        5035640.71,
+        292712.54,
+        5035657.74
+      ],
+      "n_points": 5004,
+      "n_points_class6": 2682,
+      "point_density": 12.63,
+      "laz_bytes": 46427
+    },
+    {
+      "building_id": "3322256",
+      "roof_type": "flat",
+      "reference_faces": 8,
+      "reference_roof_area_m2": 62.4,
+      "reference_mean_slope_deg": 0.0,
+      "reference_steep_fraction": 0.0,
+      "bbox": [
+        292947.48,
+        5035733.02,
+        292957.79,
+        5035744.66
+      ],
+      "n_points": 5293,
+      "n_points_class6": 2575,
+      "point_density": 23.66,
+      "laz_bytes": 52472
+    },
+    {
+      "building_id": "1291864",
+      "roof_type": "flat",
+      "reference_faces": 15,
+      "reference_roof_area_m2": 90.7,
+      "reference_mean_slope_deg": 1.72,
+      "reference_steep_fraction": 0.08,
+      "bbox": [
+        292704.22,
+        5035355.12,
+        292717.46,
+        5035368.38
+      ],
+      "n_points": 3564,
+      "n_points_class6": 1672,
+      "point_density": 11.98,
+      "laz_bytes": 35382
+    },
+    {
+      "building_id": "3321806",
+      "roof_type": "flat",
+      "reference_faces": 1,
+      "reference_roof_area_m2": 99.9,
+      "reference_mean_slope_deg": 0.0,
+      "reference_steep_fraction": 0.0,
+      "bbox": [
+        292889.88,
+        5035296.67,
+        292902.66,
+        5035312.23
+      ],
+      "n_points": 7028,
+      "n_points_class6": 3581,
+      "point_density": 21.41,
+      "laz_bytes": 73389
+    },
+    {
+      "building_id": "3322013",
+      "roof_type": "flat",
+      "reference_faces": 15,
+      "reference_roof_area_m2": 116.8,
+      "reference_mean_slope_deg": 4.75,
+      "reference_steep_fraction": 0.075,
+      "bbox": [
+        292756.84,
+        5035699.21,
+        292770.8,
+        5035714.18
+      ],
+      "n_points": 4531,
+      "n_points_class6": 2418,
+      "point_density": 13.3,
+      "laz_bytes": 43089
+    },
+    {
+      "building_id": "3321857",
+      "roof_type": "flat",
+      "reference_faces": 1,
+      "reference_roof_area_m2": 128.0,
+      "reference_mean_slope_deg": 0.0,
+      "reference_steep_fraction": 0.0,
+      "bbox": [
+        292623.22,
+        5035666.46,
+        292638.63,
+        5035675.8
+      ],
+      "n_points": 5136,
+      "n_points_class6": 3797,
+      "point_density": 19.83,
+      "laz_bytes": 47056
+    },
+    {
+      "building_id": "3321588",
+      "roof_type": "complex",
+      "reference_faces": 44,
+      "reference_roof_area_m2": 77.5,
+      "reference_mean_slope_deg": 5.69,
+      "reference_steep_fraction": 0.098,
+      "bbox": [
+        292927.06,
+        5035652.27,
+        292937.86,
+        5035666.34
+      ],
+      "n_points": 8349,
+      "n_points_class6": 5116,
+      "point_density": 31.21,
+      "laz_bytes": 87381
+    },
+    {
+      "building_id": "3321636",
+      "roof_type": "complex",
+      "reference_faces": 63,
+      "reference_roof_area_m2": 107.8,
+      "reference_mean_slope_deg": 29.67,
+      "reference_steep_fraction": 0.713,
+      "bbox": [
+        292870.79,
+        5035452.35,
+        292883.33,
+        5035465.68
+      ],
+      "n_points": 3393,
+      "n_points_class6": 945,
+      "point_density": 11.84,
+      "laz_bytes": 33864
+    },
+    {
+      "building_id": "3322101",
+      "roof_type": "complex",
+      "reference_faces": 56,
+      "reference_roof_area_m2": 129.6,
+      "reference_mean_slope_deg": 44.04,
+      "reference_steep_fraction": 0.997,
+      "bbox": [
+        292491.21,
+        5035664.47,
+        292505.64,
+        5035673.18
+      ],
+      "n_points": 5342,
+      "n_points_class6": 3336,
+      "point_density": 22.8,
+      "laz_bytes": 52219
+    },
+    {
+      "building_id": "3321887",
+      "roof_type": "complex",
+      "reference_faces": 73,
+      "reference_roof_area_m2": 153.8,
+      "reference_mean_slope_deg": 25.65,
+      "reference_steep_fraction": 0.588,
+      "bbox": [
+        292769.63,
+        5035787.15,
+        292784.92,
+        5035801.69
+      ],
+      "n_points": 14126,
+      "n_points_class6": 6104,
+      "point_density": 39.49,
+      "laz_bytes": 147485
+    }
+  ]
+}
