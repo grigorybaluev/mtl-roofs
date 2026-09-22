@@ -1,0 +1,17 @@
+# v0 study area. Chosen for roof-type variety measured from the reference model:
+# 45.7% pitched / 20.1% mixed / 34.2% flat across 1109 buildings.
+name: cdn-ndg-03
+borough: Côte-des-Neiges–Notre-Dame-de-Grâce
+description: >-
+  Reference-model tile CDNNDG03. 1109 buildings with a near-even split of pitched,
+  mixed and flat roofs, the best variety of the three candidates evaluated in
+  docs/data-sources.md. Needs only four 1 km LiDAR tiles (945 MB).
+epsg: 2950
+bbox:
+  xmin: 292347.25
+  ymin: 5034885.0
+  xmax: 293810.3125
+  ymax: 5035969.5
+reference_tiles:
+  - CDNNDG03
+expected_buildings: 1109

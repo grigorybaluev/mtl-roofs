@@ -1,0 +1,57 @@
+name: Experiment
+description: An ML or algorithm experiment with a hypothesis and a baseline to beat.
+labels: ["type:experiment"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Fill in everything above **Result** before starting. The Result section is
+        filled in when the issue is closed — an experiment with no recorded result
+        is a waste of the run.
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis
+      description: What you expect to be true, stated so it could be proven false.
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Method
+    validations:
+      required: true
+  - type: textarea
+    id: dataset
+    attributes:
+      label: Dataset and split
+      description: >
+        Study area, and how train/val/test are split. Splits must be spatially
+        blocked — adjacent Montreal row houses are near-duplicates and a random
+        split leaks.
+    validations:
+      required: true
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Metrics to report
+      description: Must already be defined in docs/evaluation.md. Do not invent one here.
+    validations:
+      required: true
+  - type: input
+    id: baseline
+    attributes:
+      label: Baseline to beat
+      description: The number and where it came from, e.g. "classical pipeline, RMSE 0.42 m".
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Result (fill in on close)
+      description: What actually happened, including if the hypothesis was wrong.
+  - type: input
+    id: artefacts
+    attributes:
+      label: Run artefacts
+      description: Link to the release asset, run log or notebook.

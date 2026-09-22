@@ -1,0 +1,55 @@
+# pixi run pre-commit install
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        # GitHub issue forms are valid YAML but use `on:`-style keys elsewhere;
+        # workflows are checked by actionlint in CI instead.
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-added-large-files
+        # No data in git. Fixtures are the only binaries and must stay tiny.
+        args: [--maxkb=2048]
+      - id: check-json
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy --strict (src)
+        # Run through pixi so mypy sees the project's own resolved environment
+        # rather than an isolated pre-commit virtualenv with no stubs.
+        entry: pixi run typecheck
+        language: system
+        types: [python]
+        pass_filenames: false
+        files: ^src/
+
+      - id: no-data-files
+        name: no data files outside tests/fixtures
+        entry: >-
+          bash -c 'bad=$(printf "%s\n" "$@" | grep -Ev "^tests/fixtures/" | grep -E "\.(laz|las|tif|tiff|gpkg|shp|dbf|shx|b3dm|pnts|glb|gltf)$" || true);
+          if [ -n "$bad" ]; then echo "Data files must not be committed:"; echo "$bad"; exit 1; fi' --
+        language: system
+        pass_filenames: true

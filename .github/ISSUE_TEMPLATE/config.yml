@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/grigorybaluev/mtl-roofs/discussions
+    about: Ask a question or float an idea in Discussions rather than opening an issue.
+  - name: Data sources and licences
+    url: https://github.com/grigorybaluev/mtl-roofs/blob/main/docs/data-sources.md
+    about: Coverage, CRS, licences and known pitfalls of the source datasets.

@@ -1,0 +1,41 @@
+:root {
+  --bg: #11131a;
+  --panel: #1b1f2a;
+  --fg: #e6e9ef;
+  --muted: #98a1b3;
+  --accent: #4fb3ff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#app { display: flex; height: 100vh; }
+#scene { flex: 1; display: block; }
+
+#panel {
+  width: 300px;
+  padding: 16px;
+  background: var(--panel);
+  border-left: 1px solid #2a3040;
+  overflow-y: auto;
+}
+
+#panel h1 { margin: 0; font-size: 18px; }
+.sub { margin: 4px 0 16px; color: var(--muted); }
+
+fieldset { border: 1px solid #2a3040; border-radius: 6px; margin: 0 0 16px; }
+legend { color: var(--muted); padding: 0 6px; }
+label { display: block; padding: 2px 0; }
+
+#metrics.empty { color: var(--muted); font-style: italic; }
+#metrics table { width: 100%; border-collapse: collapse; }
+#metrics td { padding: 3px 0; border-bottom: 1px solid #2a3040; }
+#metrics td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+footer { margin-top: 24px; color: var(--muted); font-size: 12px; }

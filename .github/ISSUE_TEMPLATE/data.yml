@@ -1,0 +1,51 @@
+name: Data source
+description: Add or change a source dataset.
+labels: ["type:data", "area:ingest"]
+body:
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Dataset name and portal URL.
+    validations:
+      required: true
+  - type: input
+    id: licence
+    attributes:
+      label: Licence and required attribution
+      description: Exact attribution string if the licence demands one.
+    validations:
+      required: true
+  - type: input
+    id: crs
+    attributes:
+      label: CRS and vertical datum
+      description: >
+        EPSG code, verified from the file's own metadata rather than the portal
+        description, plus the vertical datum.
+    validations:
+      required: true
+  - type: textarea
+    id: coverage
+    attributes:
+      label: Coverage
+      description: Spatial extent, acquisition year(s), file sizes, tiling scheme.
+    validations:
+      required: true
+  - type: textarea
+    id: quality
+    attributes:
+      label: Quality notes and pitfalls
+      description: >
+        Stated accuracy, classification codes, dead download URLs, user-agent
+        requirements, anything that would waste the next person's afternoon.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Added to `data/manifest.yaml` with URL, size and SHA-256
+        - label: Documented in `docs/data-sources.md` with the date retrieved
+        - label: Attribution added to the README if the licence requires it

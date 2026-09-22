@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: "mtl-roofs: LOD2 roof reconstruction and evaluation for Montréal"
+message: "If you use this software or its results, please cite it."
+type: software
+authors:
+  - family-names: Baluev
+    given-names: Grigory
+repository-code: "https://github.com/grigorybaluev/mtl-roofs"
+url: "https://grigorybaluev.github.io/mtl-roofs/"
+abstract: >-
+  Reconstructs LOD2 building roofs for Montréal from open aerial LiDAR and building
+  footprints, and evaluates every reconstruction against the City of Montréal's own
+  LOD2 CityGML building model using vertical RMSE, plane orientation error, topology
+  agreement and coverage, broken down by roof type, building size and point density.
+keywords:
+  - lidar
+  - 3d-reconstruction
+  - lod2
+  - citygml
+  - point-cloud
+  - computational-geometry
+  - geospatial
+  - montreal
+license: MIT
+version: 0.0.0

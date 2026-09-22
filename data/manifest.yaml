@@ -1,0 +1,103 @@
+# Pinned data sources. Nothing is fetched from a URL that is not listed here.
+# Verified against the live portal on 2026-09-22; see docs/data-sources.md.
+#
+# `sha256` is the checksum of the artefact actually written to data/raw/:
+#   kind: file            -> the downloaded file
+#   kind: archive         -> the whole archive is NEVER downloaded; members are
+#                            range-extracted, so the archive itself has no checksum
+#                            and `size` is what the server reports.
+#   kind: archive-member  -> checksum of the extracted member.
+#
+# Member checksums are filled in by `mtl-roofs data fetch` on first retrieval and
+# committed, so later runs verify against them. `null` means "not yet pinned" and is
+# reported by the CLI rather than passing silently.
+
+crs:
+  horizontal: 2950        # NAD83(CSRS) / MTM zone 8 - read from a LAS GeoKey, not assumed
+  vertical: CGVD28
+  units: metre
+
+licence:
+  name: CC BY 4.0
+  url: https://creativecommons.org/licenses/by/4.0/
+  attribution: >-
+    Contains information licensed under CC BY 4.0 from the Ville de Montréal
+    (LiDAR aérien 2015; Bâtiments 3D 2016 — Maquette LOD2; Bâtiments 2D 2016).
+    Portions of the 2D building layer derive from 2007 aerial photography
+    © Communauté métropolitaine de Montréal.
+
+http:
+  # Both hosts return 403 to non-browser agents. See docs/data-sources.md.
+  require_browser_user_agent: true
+
+sources:
+
+  # ----------------------------------------------------------------- footprints
+  footprints_2d_2016:
+    kind: file
+    url: https://donnees.montreal.ca/dataset/fab160ae-c81d-46f8-8f92-4a01c10d4390/resource/183866d5-9027-456a-b0af-36b2e45c8aac/download/batiments_2d_2016_arrondissements.zip
+    size: 100284823
+    sha256: 4bdc03865e47962b2b284c301b275189caea0e24e17f555934901b82feedd7f9
+    note: >-
+      Shapefile bundle. Primary layer CARTO-BAT-TOIT (237810 roof polygons).
+      No building identifier field: matching to the reference model is spatial.
+
+  # --------------------------------------------------------------------- LiDAR
+  # Five bulk archives, 119.47 GB total, 684 tiles of 1 km². Range-readable.
+  # The per-tile URLs in the city's own indexlidar2015.csv are ALL dead (HTTP 404).
+  lidar2015_266-279:
+    kind: archive
+    url: https://depot.ville.montreal.qc.ca/geomatique/lidar_aerien/2015/LAS2015_classifiees_266-279.zip
+    size: 26060962270
+    note: 164 tiles, extreme west of the island.
+  lidar2015_280-289:
+    kind: archive
+    url: https://depot.ville.montreal.qc.ca/geomatique/lidar_aerien/2015/LAS2015_classifiees_280-289.zip
+    size: 21560159209
+    note: 128 tiles, west of the island.
+  lidar2015_290-294:
+    kind: archive
+    url: https://depot.ville.montreal.qc.ca/geomatique/lidar_aerien/2015/LAS2015_classifiees_290-294.zip
+    size: 20568389580
+    note: 108 tiles, centre of the island. Covers the v0 study area.
+  lidar2015_295-299:
+    kind: archive
+    url: https://depot.ville.montreal.qc.ca/geomatique/lidar_aerien/2015/LAS2015_classifiees_295-299.zip
+    size: 28470506643
+    note: 141 tiles, east of the island.
+  lidar2015_300-307:
+    kind: archive
+    url: https://depot.ville.montreal.qc.ca/geomatique/lidar_aerien/2015/LAS2015_classifiees_300-307.zip
+    size: 22813806401
+    note: 143 tiles, extreme east of the island.
+
+  # ----------------------------------------------- reference model (LOD2, 2016)
+  # Per-borough archives of nested per-tile ZIPs. Each inner ZIP is deflated, so it
+  # is streamed whole and only the .gml is kept; the texture JPEGs are discarded.
+  lod2_2016_cdnndg_01_12:
+    kind: archive
+    url: https://donnees.montreal.ca/dataset/5eabd047-872e-425a-bbc2-3669e732a132/resource/c98ab26f-829f-4d6a-b4da-54df490659b8/download/cdnndg_2016_gml_01_12.zip
+    size: 4246900000
+    note: >-
+      Côte-des-Neiges–Notre-Dame-de-Grâce tiles 01-12. Member CDNNDG03 (207 MB)
+      covers the v0 study area.
+  lod2_2016_o_01_03:
+    kind: archive
+    url: https://donnees.montreal.ca/dataset/5eabd047-872e-425a-bbc2-3669e732a132/resource/e2ecbbe9-00d9-444f-9327-cb8215e71121/download/o01_2016_gml_01_03.zip
+    size: 1245900000
+    note: Outremont tiles 01-03. Most roof-type variety per building.
+  lod2_2016_pmr_01_11:
+    kind: archive
+    url: https://donnees.montreal.ca/dataset/5eabd047-872e-425a-bbc2-3669e732a132/resource/2fd0e610-9e20-415b-9610-43adaa6acb57/download/pmr_2016_gml_01_11.zip
+    size: 4784600000
+    note: Plateau-Mont-Royal tiles 01-11. Almost entirely flat roofs.
+
+  # ------------------------------------------------------- reference index only
+  lidar2015_tile_index:
+    kind: file
+    url: https://donnees.montreal.ca/fr/dataset/9ae61fa2-c852-464b-af7f-82b169b970d7/resource/ec35760c-5cbe-44a0-8ad1-30c037174b0a/download/indexlidar2015.csv
+    size: 69797
+    sha256: null
+    note: >-
+      Kept for the tile geometry only. Its lien_URL column is stale: every one of
+      the 684 per-tile URLs returns HTTP 404. Do not fetch from it.
