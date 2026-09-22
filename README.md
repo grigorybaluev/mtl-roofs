@@ -75,10 +75,15 @@ pixi install                 # conda-forge: PDAL, GDAL, PROJ, GEOS, the lot
 pixi run test                # unit tests
 pixi run db-up               # PostGIS in Docker, waits for healthcheck
 
-pixi run mtl-roofs data areas          # study areas
-pixi run mtl-roofs data plan  -a cdn-ndg-03   # what would be downloaded
-pixi run mtl-roofs data fetch -a cdn-ndg-03   # ~1.2 GB
+pixi run mtl-roofs data areas                  # study areas
+pixi run mtl-roofs data plan   -a cdn-ndg-03   # what would be downloaded, and what is pinned
+pixi run mtl-roofs data fetch  -a cdn-ndg-03   # ~1.07 GB, verified against the manifest
+pixi run mtl-roofs data verify -a cdn-ndg-03   # re-check what is on disk, offline
 ```
+
+Every artefact is checked against a SHA-256 pinned in `data/manifest.yaml`. An existing
+file that fails verification is re-downloaded once; if it still fails, the command exits
+non-zero rather than letting a corrupt tile into the pipeline.
 
 `data fetch` does **not** download the city's 20 GB archives. It reads their ZIP64
 central directories over HTTP range requests and streams only the tiles the study

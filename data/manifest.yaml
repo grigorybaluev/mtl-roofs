@@ -5,12 +5,18 @@
 #   kind: file            -> the downloaded file
 #   kind: archive         -> the whole archive is NEVER downloaded; members are
 #                            range-extracted, so the archive itself has no checksum
-#                            and `size` is what the server reports.
-#   kind: archive-member  -> checksum of the extracted member.
+#                            and `size` is what the server reports. Each entry under
+#                            `members:` carries the checksum of one extracted
+#                            artefact, and `artifact:` names the file that lands in
+#                            data/raw/ when it differs from the member key.
 #
-# Member checksums are filled in by `mtl-roofs data fetch` on first retrieval and
-# committed, so later runs verify against them. `null` means "not yet pinned" and is
-# reported by the CLI rather than passing silently.
+# Member checksums are computed by `mtl-roofs data checksums -a <area>`, which PRINTS
+# the YAML block to paste here. Nothing writes to this file automatically, and that is
+# deliberate: a tool that pinned whatever it had just downloaded would certify a
+# corrupted file exactly as confidently as a good one. Pinning is a reviewed act.
+#
+# A member with no `sha256` is "not yet pinned": `data fetch` and `data verify` report
+# it in their summary rather than letting it pass silently.
 
 crs:
   horizontal: 2950        # NAD83(CSRS) / MTM zone 8 - read from a LAS GeoKey, not assumed
@@ -37,7 +43,7 @@ sources:
     kind: file
     url: https://donnees.montreal.ca/dataset/fab160ae-c81d-46f8-8f92-4a01c10d4390/resource/183866d5-9027-456a-b0af-36b2e45c8aac/download/batiments_2d_2016_arrondissements.zip
     size: 100284823
-    sha256: 4bdc03865e47962b2b284c301b275189caea0e24e17f555934901b82feedd7f9
+    sha256: "4bdc03865e47962b2b284c301b275189caea0e24e17f555934901b82feedd7f9"
     note: >-
       Shapefile bundle. Primary layer CARTO-BAT-TOIT (237810 roof polygons).
       No building identifier field: matching to the reference model is spatial.
@@ -60,6 +66,22 @@ sources:
     url: https://depot.ville.montreal.qc.ca/geomatique/lidar_aerien/2015/LAS2015_classifiees_290-294.zip
     size: 20568389580
     note: 108 tiles, centre of the island. Covers the v0 study area.
+    members:
+      # The four 1 km tiles covering study area cdn-ndg-03. Checksums are over the
+      # extracted .las, which is what lands in data/raw/ — the 20 GB archive around
+      # them is never downloaded, so it has no checksum of its own.
+      292-5034_2015.las:
+        sha256: "98d610a254fcca6c812ea18a3731ca4914253d2454100190f86681cfe711afcb"
+        size: 562561030
+      292-5035_2015.las:
+        sha256: "ef3ae834cdd86f9575ab5745f15d37bf1664f275256e6bb25a40545f43b9f1a3"
+        size: 545900882
+      293-5034_2015.las:
+        sha256: "3178266adfea994bdd86a836fa3eb00aa4d226fea7aeeddd3479b3947876065f"
+        size: 483140150
+      293-5035_2015.las:
+        sha256: "25e3efe24297fb60790cc48e43670fdedd159151b88d206a112e68c666513d70"
+        size: 534982310
   lidar2015_295-299:
     kind: archive
     url: https://depot.ville.montreal.qc.ca/geomatique/lidar_aerien/2015/LAS2015_classifiees_295-299.zip
@@ -81,6 +103,14 @@ sources:
     note: >-
       Côte-des-Neiges–Notre-Dame-de-Grâce tiles 01-12. Member CDNNDG03 (207 MB)
       covers the v0 study area.
+    members:
+      # `artifact` differs from the member key here: the archive member is a nested
+      # ZIP of CityGML plus texture JPEGs, and only the .gml is kept. The checksum is
+      # over that extracted .gml, so it can be re-verified offline.
+      CDNNDG03:
+        artifact: CDNNDG03_2016.gml
+        sha256: "ba76f5664cf4d38147a4562883314057a66025bec160d63b262cea123b9c874c"
+        size: 86857720
   lod2_2016_o_01_03:
     kind: archive
     url: https://donnees.montreal.ca/dataset/5eabd047-872e-425a-bbc2-3669e732a132/resource/e2ecbbe9-00d9-444f-9327-cb8215e71121/download/o01_2016_gml_01_03.zip

@@ -11,6 +11,7 @@ Two properties of these files drive the design:
 from __future__ import annotations
 
 import math
+import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -161,3 +162,41 @@ def iter_buildings(path: Path) -> Iterator[ReferenceBuilding]:
         }
         yield ReferenceBuilding(element.get(id_attr, ""), roofs, attributes)
         element.clear()
+
+
+def extract_citygml(nested_archive: Path, dest_dir: Path) -> Path:
+    """Unpack the single CityGML file out of a per-tile reference archive.
+
+    Each borough archive holds one nested ZIP per tile, and each of those holds one
+    ``.gml`` beside a folder of texture JPEGs. Only the geometry is wanted: for tile
+    PMR06 the CityGML is 35 MB of a 169 MB member, the rest being 399 textures that
+    this project never reads.
+
+    Args:
+        nested_archive: The per-tile ZIP, as extracted from the borough archive.
+        dest_dir: Directory to write the ``.gml`` into.
+
+    Returns:
+        Path to the extracted CityGML file.
+
+    Raises:
+        ValueError: if the archive holds no ``.gml``, or more than one.
+    """
+    with zipfile.ZipFile(nested_archive) as bundle:
+        names = [n for n in bundle.namelist() if n.lower().endswith(".gml")]
+        if len(names) != 1:
+            msg = f"{nested_archive.name}: expected exactly one .gml, found {len(names)}"
+            raise ValueError(msg)
+        name = names[0]
+        dest = dest_dir / Path(name).name
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_suffix(dest.suffix + ".part")
+        try:
+            with bundle.open(name) as src, tmp.open("wb") as out:
+                while chunk := src.read(1 << 20):
+                    out.write(chunk)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
+        tmp.replace(dest)
+    return dest
