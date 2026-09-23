@@ -8,9 +8,11 @@
     "edits it alongside code in src/mtl_roofs/{geometry,evaluation,ml}/."
   ],
   "fixture_set": {
-    "n_buildings": 20,
+    "n_footprints": 20,
+    "n_buildings": 35,
     "lidar_tile": "292-5035",
     "reference_tile": "CDNNDG03",
+    "footprint_layer": "CARTO-BAT-TOIT",
     "crs": "EPSG:2950"
   },
   "tolerances": {
@@ -33,25 +35,25 @@
     },
     "by_roof_type": {
       "flat": {
-        "n": 5,
+        "n": 13,
         "vertical_rmse_m": null,
         "orientation_error_median_deg": null,
         "coverage": null
       },
       "mixed": {
-        "n": 5,
+        "n": 7,
         "vertical_rmse_m": null,
         "orientation_error_median_deg": null,
         "coverage": null
       },
       "pitched": {
-        "n": 6,
+        "n": 10,
         "vertical_rmse_m": null,
         "orientation_error_median_deg": null,
         "coverage": null
       },
       "complex": {
-        "n": 4,
+        "n": 5,
         "vertical_rmse_m": null,
         "orientation_error_median_deg": null,
         "coverage": null
