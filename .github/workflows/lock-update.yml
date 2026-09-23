@@ -38,7 +38,9 @@ jobs:
 
       - uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # A fine-grained PAT, not GITHUB_TOKEN: PRs opened with GITHUB_TOKEN do not
+          # trigger ci or eval-smoke, so the lock PR could never pass required checks.
+          token: ${{ secrets.LOCK_UPDATE_TOKEN }}
           branch: chore/pixi-lock-update
           delete-branch: true
           title: "chore(deps): update pixi.lock"
