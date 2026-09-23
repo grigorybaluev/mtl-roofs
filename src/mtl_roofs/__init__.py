@@ -10,7 +10,7 @@ elevations. See ``docs/data-sources.md`` for why, and ``CLAUDE.md`` for the
 conventions every module is expected to honour.
 """
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 
 #: Horizontal CRS every dataset is reprojected to before processing.
 CRS_EPSG = 2950
