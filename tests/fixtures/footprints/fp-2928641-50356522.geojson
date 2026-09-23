@@ -1,0 +1,64 @@
+{
+ "type": "FeatureCollection",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:EPSG::2950"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "footprint_id": "fp-2928641-50356522",
+    "lidar_derived": false,
+    "methode": "photogrammétrie",
+    "source": "photo aérienne 2016, (C) Communauté métropolitaine de Montréal",
+    "MAJ": "avril 2016"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       292862.667,
+       5035658.559
+      ],
+      [
+       292866.191,
+       5035656.735
+      ],
+      [
+       292869.926,
+       5035654.803
+      ],
+      [
+       292865.826,
+       5035646.88
+      ],
+      [
+       292865.002,
+       5035645.055
+      ],
+      [
+       292861.733,
+       5035648.107
+      ],
+      [
+       292858.146,
+       5035650.002
+      ],
+      [
+       292858.567,
+       5035650.636
+      ],
+      [
+       292862.667,
+       5035658.559
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
