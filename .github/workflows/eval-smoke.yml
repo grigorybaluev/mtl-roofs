@@ -8,6 +8,9 @@ on:
     paths:
       - "src/**"
       - "tests/fixtures/**"
+      # A dependency bump (numpy, scipy, …) can move the metrics without any code
+      # changing, and that drift must show up in its own PR.
+      - "pixi.lock"
       - ".github/workflows/eval-smoke.yml"
 
 permissions:
