@@ -96,10 +96,14 @@ flagged `withheld`. Measured on tile `292-5035`:
   class-28 points lie within 0.5 m of a reference roof face. On some buildings they're
   the only returns from a **lower roof section** (rear extensions, porch roofs): 169 of
   176 on `3321611`, 131 of 145 on `3321923`.
-- A height-above-ground cut separates the two groups. At > 2.5 m it keeps 98% of the
-  on-roof class-28 points and 30% of the off-roof ones.
+- A height-above-ground cut separates the two groups, but the lowest real roof faces
+  are only **1.58 m** above local ground (median of the 8 nearest ground points). On the
+  20 fixture footprints, a cut at 2.5 m would lose 25% of the class-28 roof points.
 
-The filter's decision on class 28 is recorded in `geometry/clip.py` and in #17.
+**Decision (#17):** class 28, like class 1, is kept only more than **1.5 m** above
+local ground. On the fixtures that keeps every on-roof class-28 point, plus 58% of the
+clutter (about 0.8% of retained points), which plane detection rejects as outliers.
+The policy for every class is in `geometry/clip.py`.
 
 That tile also measures **19.50 pts/m²** over 1 km² (Z 9.9–99.1 m), against 18.09
 pts/m² for tile `290-5035` — so density varies meaningfully between tiles and is
