@@ -54,7 +54,7 @@ disallow_any_generics = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pdal.*", "laspy.*", "open3d.*", "py3dtiles.*", "geoalchemy2.*", "rasterio.*", "geopandas.*", "shapely.*", "pyproj.*"]
+module = ["pdal.*", "laspy.*", "open3d.*", "py3dtiles.*", "geoalchemy2.*", "rasterio.*", "geopandas.*", "shapely.*", "pyproj.*", "scipy.*"]
 ignore_missing_imports = true
 
 # ------------------------------------------------------------------- pytest

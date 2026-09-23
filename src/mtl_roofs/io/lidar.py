@@ -11,6 +11,9 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
+import numpy.typing as npt
+
 #: Byte offsets into the LAS 1.2 public header block.
 _OFF_VERSION = 24
 _OFF_POINT_FORMAT = 104
@@ -19,7 +22,8 @@ _OFF_SCALE = 131
 _OFF_BOUNDS = 179
 _LAS_HEADER_MIN = 227
 
-#: ASPRS classification codes as published for this dataset.
+#: ASPRS classification codes as published for this dataset, plus class 28, which the
+#: city does not document; see docs/data-sources.md for what it was measured to be.
 CLASSIFICATION = {
     1: "unclassified",
     2: "ground",
@@ -29,14 +33,38 @@ CLASSIFICATION = {
     6: "building",
     7: "low point (noise)",
     8: "reserved",
+    28: "undocumented",
 }
 
-#: Classes the reconstruction consumes. Class 6 is *not* assumed to be populated —
-#: see docs/data-sources.md; the filter falls back to geometric separation.
-ROOF_CANDIDATE_CLASSES = frozenset({1, 6})
-GROUND_CLASSES = frozenset({2})
-VEGETATION_CLASSES = frozenset({3, 4, 5})
-NOISE_CLASSES = frozenset({7})
+
+@dataclass(frozen=True, slots=True)
+class PointSet:
+    """Point coordinates and their classification codes, row-aligned."""
+
+    xyz: npt.NDArray[np.float64]
+    classification: npt.NDArray[np.uint8]
+
+    def __post_init__(self) -> None:
+        """Reject misaligned arrays at construction, not at first use."""
+        if self.xyz.ndim != 2 or self.xyz.shape[1] != 3:
+            msg = f"expected an (n, 3) xyz array, got shape {self.xyz.shape}"
+            raise ValueError(msg)
+        if self.classification.shape != (len(self.xyz),):
+            msg = f"{len(self.xyz)} points but {self.classification.shape} classes"
+            raise ValueError(msg)
+
+    def __len__(self) -> int:
+        """Number of points."""
+        return len(self.xyz)
+
+
+def read_points(path: Path) -> PointSet:
+    """Read a LAS or LAZ file into a :class:`PointSet`, with scaled coordinates."""
+    import laspy
+
+    las = laspy.read(path)
+    xyz = np.column_stack([np.asarray(las.x), np.asarray(las.y), np.asarray(las.z)])
+    return PointSet(xyz.astype(np.float64), np.asarray(las.classification, dtype=np.uint8))
 
 
 @dataclass(frozen=True, slots=True)
