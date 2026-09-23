@@ -15,6 +15,10 @@ concurrency:
 
 jobs:
   lint:
+    # Dependabot capitalises its subjects ("Bump x from…") and cannot be configured
+    # not to. Keyed on the PR author, not github.actor, so a human editing or
+    # rebasing a Dependabot PR does not bring the check back.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
