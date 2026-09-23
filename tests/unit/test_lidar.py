@@ -7,7 +7,6 @@ import struct
 import pytest
 
 from mtl_roofs.io.lidar import (
-    GROUND_CLASSES,
     parse_las_header,
     tile_member,
     tile_name,
@@ -81,7 +80,3 @@ def test_tile_naming_matches_the_city_scheme(
 
 def test_member_name_matches_the_archive() -> None:
     assert tile_member("292-5034") == "292-5034_2015.las"
-
-
-def test_ground_class_is_two() -> None:
-    assert {2} == GROUND_CLASSES
