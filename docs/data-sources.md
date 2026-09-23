@@ -75,14 +75,31 @@ Read by inflating the first ~1.5 MB of member `290-5035_2015.las`:
 | **28** | **undocumented** | **1,062,225** | **5.45%** |
 
 **Class 6 is populated** — an earlier partial read of one contiguous slice of tile
-`290-5035` showed no class 6 and was misleading; a full-tile decode settles it. Roof
-points can be taken from class 6, though class 1 (31%) certainly also contains roof
-returns, so the filter should not rely on class 6 alone.
+`290-5035` showed no class 6 and was misleading; a full-tile decode settles it.
+
+**Class 6 carries the roofs; class 1 does not.** An earlier version of this document
+said class 1 "certainly also contains roof returns". Measured, it doesn't. Over the
+whole tile, class 1's height above ground has a median of 0.08 m (p90 0.27 m). Inside
+the reference roof outlines of the 20 fixture buildings, **none** of the 654 class-1
+points is at roof height. Class 1 is ground-level surface the classifier left
+unlabelled.
 
 **Class 28 is not in the city's published class list** and accounts for 5.45% of
-points. It is most likely overlap/withheld points from adjacent flight lines. The
-filter must decide explicitly whether to keep it rather than letting it fall through
-an `else` branch; tracked by the point-filtering issue.
+points. It is **not** flight-line overlap, as first assumed. It occurs in every flight
+line (`point_source_id`) in proportion, its scan angles are ordinary, and no point is
+flagged `withheld`. Measured on tile `292-5035`:
+
+- 64% of class-28 points are 0.5–2 m above ground and 22% are 2–5 m; only 56% are
+  single returns (82–92% for other classes). That is low clutter: vehicles, fences,
+  hedges.
+- On roofs, it's different. Inside the fixtures' reference roof outlines, 48% of
+  class-28 points lie within 0.5 m of a reference roof face. On some buildings they're
+  the only returns from a **lower roof section** (rear extensions, porch roofs): 169 of
+  176 on `3321611`, 131 of 145 on `3321923`.
+- A height-above-ground cut separates the two groups. At > 2.5 m it keeps 98% of the
+  on-roof class-28 points and 30% of the off-roof ones.
+
+The filter's decision on class 28 is recorded in `geometry/clip.py` and in #17.
 
 That tile also measures **19.50 pts/m²** over 1 km² (Z 9.9–99.1 m), against 18.09
 pts/m² for tile `290-5035` — so density varies meaningfully between tiles and is
@@ -200,18 +217,34 @@ these, and headline metrics should be reported both raw and after excluding flag
 source, producteur, superficie, version`.
 
 **There is no building identifier of any kind.** There is consequently **no join key**
-between the footprints and the CityGML `gml:id`. Building matching must be spatial
-(centroid containment plus maximum IoU, with an explicit tie-break rule). This is a design
-decision with real alternatives and gets an ADR before implementation; it also means a
-matching failure rate is itself a metric to report, not an implementation detail to hide.
+between the footprints and the CityGML `gml:id`. Building matching must be spatial, and
+the match rate is a metric to report, not an implementation detail to hide.
 
-Provenance is mixed and recorded per feature:
-- most records: `methode = photogrammétrie`, `source = photo aérienne 2007, (C) Communauté
-  métropolitaine de Montréal`, `MAJ = juillet 2015`, `EQM_plani = ± 30 à ± 40 cm`;
-- some records: `methode = modélisation automatique`, `source = LiDAR aérien 2015, Ville de
-  Montréal`, `MAJ = novembre 2015`.
+**The two layers split buildings differently.** `CARTO-BAT-TOIT` draws one polygon per
+continuous roof, so a semi-detached pair or a row is one polygon. The reference model
+splits it into one building per address. On `cdn-ndg-03`, 60% of reference buildings
+share a footprint with a neighbour (311 footprints hold exactly two). Every reference
+building lies more than 50% inside a single footprint. This is why matching is by
+containment, not one-to-one IoU: see
+[ADR 0005](adr/0005-reconstruct-per-footprint-score-per-building.md).
 
-The second group is **derived from the same LiDAR this project reconstructs from**. Those
+Provenance is mixed and recorded per feature. Counted over all 237,810 records (an
+earlier version of this document had the 2007 group as "most records"):
+
+| `methode` | `source` | `MAJ` | records |
+|---|---|---|---:|
+| photogrammétrie | photo aérienne 2016, CMM | avril 2016 | 172,050 |
+| numérisé sur orthophoto | orthophoto 2016, Ville de Montréal | avril 2016 | 46,590 |
+| **modélisation automatique** | **LiDAR aérien 2015, Ville de Montréal** | novembre 2015 | **19,130** |
+| photogrammétrie | photo aérienne 2007, CMM | juillet 2015 | 37 |
+| numérisé sur orthophoto | orthophoto 2015, CMM | juillet 2015 | 3 |
+
+`EQM_plani` is `± 30 à ± 40 cm` for the photogrammetric records.
+
+**Duplicates:** 10 polygons appear twice, with the same geometry and different
+attributes. ADR 0005 treats each pair as one footprint.
+
+The LiDAR group is **derived from the same LiDAR this project reconstructs from**. Those
 footprints are not independent of the input, and buildings falling in that group should be
 flagged so the evaluation can report them separately. `EQM_alti` is `ND` (not determined)
 throughout — the layer carries no stated vertical accuracy.

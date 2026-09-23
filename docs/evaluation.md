@@ -13,6 +13,14 @@ Metrics are written here **before** they are implemented, and the implementation
 
 Reconstruction (from 2015 LiDAR) against the city's 2016 LOD2 CityGML model.
 
+**Units** ([ADR 0005](adr/0005-reconstruct-per-footprint-score-per-building.md)): the
+pipeline reconstructs one roof per `CARTO-BAT-TOIT` footprint. Scoring is **per
+reference building**. Each one is assigned to the footprint containing the largest
+share (≥ 0.5) of its *roof outline*: the 2D union of its roof surfaces. It is then
+scored against that footprint's reconstruction, restricted to the outline. One
+footprint often holds a semi-detached pair or a row, so it can be scored against
+several reference buildings.
+
 The reference is **not ground truth in the strict sense**. It is an independent
 photogrammetric product with its own error, built from different imagery a year
 later. Every number below is therefore a *disagreement* between two models, and the
@@ -25,7 +33,8 @@ counted.
 ### 1. Vertical RMSE
 
 Both surfaces are sampled onto a common **0.5 m** grid clipped to the reference
-building's footprint, in EPSG:2950, elevations in metres above CGVD28.
+building's roof outline, in EPSG:2950, elevations in metres above CGVD28. The
+predicted surface is the reconstruction of the footprint the building is assigned to.
 
 $$\mathrm{RMSE} = \sqrt{\frac{1}{|V|}\sum_{c \in V} (z^{\text{pred}}_c - z^{\text{ref}}_c)^2}$$
 
@@ -48,7 +57,8 @@ For each matched pair of roof planes, the unsigned angle between unit normals:
 $$\theta = \arccos\left(\left|\hat{n}^{\text{pred}} \cdot \hat{n}^{\text{ref}}\right|\right) \in [0°, 90°]$$
 
 Unsigned because a roof plane's outward orientation is a convention of whichever
-writer produced it. Planes are matched greedily by smallest angle among planes whose
+writer produced it. Predicted faces are first clipped to the reference building's
+roof outline. Planes are matched greedily by smallest angle among planes whose
 projected areas overlap by IoU ≥ 0.3. Report the **median** and the 90th percentile;
 the mean is dominated by a handful of catastrophic faces and hides the typical case.
 
@@ -59,14 +69,28 @@ $$\mathrm{agreement} = \frac{\min(f^{\text{pred}}, f^{\text{ref}})}{\max(f^{\tex
 Symmetric, so over- and under-segmentation by the same factor score alike. Only
 roof faces count; the reference's walls and ground are synthetic.
 
+$f^{\text{pred}}$ counts the faces of the assigned footprint's reconstruction with
+**at least 25% of their projected area** inside the reference building's roof outline.
+A face spanning a party wall therefore counts for both buildings. A sliver of the
+neighbour's face, caused by the footprints' ±30–40 cm edge accuracy, counts for
+neither.
+
 Reported alongside the raw counts, because agreement alone cannot distinguish "both
 found 4 faces" from "both found 40".
 
 ### 5. Building match rate
 
-The fraction of footprints matched to a reference building at IoU ≥ 0.5. Because the
-footprint layer carries **no building identifier**, matching is spatial and
-imperfect; the match rate is a headline number, not a footnote.
+The fraction of non-grouped reference buildings assigned to a footprint, i.e. with
+**≥ 50% of their roof outline inside one footprint** (ADR 0005). The footprint layer
+carries **no building identifier**, so assignment is spatial. The match rate is a
+headline number, not a footnote.
+
+Reported next to it: the number of footprints with no reference building assigned
+(`no-reference`), and the distribution of reference buildings per footprint.
+
+*Superseded definition:* one-to-one matching at IoU ≥ 0.5 (ADR 0004). On `cdn-ndg-03`
+it would have left 32% of buildings unmatched, because 60% of reference buildings
+share a footprint with a neighbour.
 
 ## Breakdowns
 
@@ -76,7 +100,8 @@ Every headline metric is broken down by:
   reference model as the area-weighted fraction of roof steeper than 15°:
   `< 0.10` flat, `< 0.60` mixed, otherwise pitched. This is the same rule the v1
   classifier is scored against, so it must stay reproducible;
-- **building size** — footprint area `<100`, `100–250`, `250–1000`, `≥1000` m²;
+- **building size** — reference roof-outline area `<100`, `100–250`, `250–1000`,
+  `≥1000` m²;
 - **point density** — `<5`, `5–10`, `10–20`, `≥20` points/m².
 
 Bins are fixed constants in `evaluation/report.py`, not derived from the run, so
@@ -113,13 +138,16 @@ Ranked by expected impact.
 
 ## The failure log
 
-Every building produces a row, including failures — a building that could not be
-reconstructed must be *visible*, not absent. Statuses:
+Every reference building and every footprint produces a row, including failures. A
+building that could not be reconstructed must be *visible*, not absent. A reference
+building takes the status of its footprint's reconstruction unless it has one of its
+own (`no-match`, `grouped-reference`). Statuses:
 
 | status | meaning |
 |---|---|
 | `ok` | reconstructed and matched |
-| `no-match` | no reference building at IoU ≥ 0.5 |
+| `no-match` | reference building with no footprint containing ≥ 50% of its roof outline |
+| `no-reference` | footprint with no reference building assigned (reported, not scored) |
 | `too-few-points` | below the minimum point count for plane fitting |
 | `no-planes` | RANSAC found no plane meeting the inlier threshold |
 | `solver-failed` | topology solver did not converge |

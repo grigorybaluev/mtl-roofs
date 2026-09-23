@@ -1,6 +1,6 @@
 # 0004. Matching reconstructions to reference buildings
 
-- **Status:** accepted
+- **Status:** superseded by [0005](0005-reconstruct-per-footprint-score-per-building.md)
 - **Date:** 2026-09-22
 
 ## Context
