@@ -17,9 +17,19 @@ def plan():
     return _plan_artifacts("cdn-ndg-03")
 
 
-def test_plan_covers_lidar_and_reference(plan) -> None:
+def test_plan_covers_lidar_reference_and_footprints(plan) -> None:
     labels = sorted(item.label for item in plan.items)
-    assert labels == ["lidar"] * 4 + ["reference"]
+    assert labels == ["footprints"] + ["lidar"] * 4 + ["reference"]
+
+
+def test_footprints_are_the_whole_pinned_zip(plan) -> None:
+    """Footprints are downloaded whole, so the pin is the source's own checksum."""
+    footprints = next(i for i in plan.items if i.label == "footprints")
+    source = plan.sources[footprints.source_key]
+    assert not source.is_archive
+    assert footprints.member.artifact == "batiments_2d_2016_arrondissements.zip"
+    assert footprints.member.sha256 == source.sha256
+    assert footprints.member.size == source.size
 
 
 def test_every_artifact_resolves_to_an_archive(plan) -> None:

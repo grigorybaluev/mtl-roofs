@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
+from urllib.request import Request, urlopen
 
 import typer
 from rich.console import Console
@@ -84,7 +85,12 @@ def data_plan(
         if item.source_key is None:
             table.add_row(item.label, "[red]not in manifest[/red]", item.member.artifact, "-", "-")
             continue
-        size = _member_size(plan.sources[item.source_key].url, item.member.key, settings)
+        source = plan.sources[item.source_key]
+        size = (
+            _member_size(source.url, item.member.key, settings)
+            if source.is_archive
+            else source.size
+        )
         total += size or 0
         table.add_row(
             item.label,
@@ -233,7 +239,11 @@ def data_checksums(
 
     for source_key, members in by_source.items():
         console.print(f"[bold]{source_key}:[/bold]")
-        console.print(member_yaml_block(members))
+        if plan.sources[source_key].is_archive:
+            console.print(member_yaml_block(members))
+        else:
+            (pinned,) = members
+            console.print(f'    sha256: "{pinned.sha256}"\n    size: {pinned.size}')
         console.print()
 
 
@@ -294,9 +304,10 @@ class _Plan:
 def _plan_artifacts(area: str) -> _Plan:
     """Resolve a study area to the artefacts it needs and the archives holding them.
 
-    Both the LiDAR tiles implied by the bounding box and the reference-model tiles
-    named in the area config are included; earlier the fetch command silently
-    handled only the former.
+    Included: the LiDAR tiles implied by the bounding box, the reference-model tiles
+    named in the area config, and the footprint layer. Earlier the fetch command
+    silently handled only the LiDAR, and later left out the footprints, which are
+    the pipeline's primary input.
     """
     study = StudyArea.load(area)
     sources = load_manifest()
@@ -318,11 +329,27 @@ def _plan_artifacts(area: str) -> _Plan:
         member = sources[key].members.get(tile, default) if key else default
         items.append(_Artifact(member=member, source_key=key, label="reference"))
 
+    # City-wide, so every area needs the same file. It is small enough (100 MB) to
+    # download whole, and is pinned at the source level rather than per member.
+    footprints = sources.get(FOOTPRINTS_SOURCE)
+    if footprints is None:
+        missing = Member(key=FOOTPRINTS_SOURCE, artifact=FOOTPRINTS_SOURCE)
+        items.append(_Artifact(member=missing, source_key=None, label="footprints"))
+    else:
+        name = footprints.url.rsplit("/", 1)[-1]
+        member = Member(key=name, artifact=name, sha256=footprints.sha256, size=footprints.size)
+        items.append(_Artifact(member=member, source_key=FOOTPRINTS_SOURCE, label="footprints"))
+
     return _Plan(study=study, sources=sources, items=items)
 
 
 def _retrieve(item: _Artifact, source: Source, raw: Path, settings: Settings) -> None:
-    """Fetch one artefact out of its remote archive into ``raw``."""
+    """Fetch one artefact, from its remote archive or as a whole file, into ``raw``."""
+    if not source.is_archive:
+        console.print(f"[dim]...[/dim]   {item.member.artifact} from {source.key}")
+        _download(source.url, raw / item.member.artifact, settings.user_agent)
+        return
+
     archive = RemoteZip(source.url, settings.user_agent)
     zip_member = archive.member(item.member.key)
     console.print(f"[dim]...[/dim]   {item.member.artifact} from {source.key}")
@@ -359,6 +386,23 @@ def _report_summary(unpinned: list[str], failed: list[str], area: str) -> None:
 
 
 # ----------------------------------------------------------------- helpers
+#: Manifest key of the city-wide footprint layer (CARTO-BAT-TOIT and friends).
+FOOTPRINTS_SOURCE = "footprints_2d_2016"
+
+
+def _download(url: str, dest: Path, user_agent: str, chunk_size: int = 1 << 20) -> None:
+    """Stream a whole file to ``dest``, via a temporary name so a partial file never lands."""
+    partial = dest.with_name(dest.name + ".part")
+    req = Request(url, headers={"User-Agent": user_agent})
+    try:
+        with urlopen(req, timeout=300.0) as resp, partial.open("wb") as out:
+            while chunk := resp.read(chunk_size):
+                out.write(chunk)
+        partial.replace(dest)
+    finally:
+        partial.unlink(missing_ok=True)
+
+
 def _lidar_archive_for(tile: str, sources: Mapping[str, Source]) -> str | None:
     """Find the manifest key of the bulk archive holding a LiDAR tile.
 
