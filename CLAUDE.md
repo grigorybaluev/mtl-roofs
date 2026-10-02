@@ -66,7 +66,8 @@ mtl-roofs report      -a <area>
 
 ## Workflow contract
 
-1. Pick an issue from the project board, column **Ready**.
+1. Pick the highest-priority open issue in the current milestone that is not labelled
+   `blocked` or `needs-decision` (`gh issue list --milestone <m> --label priority:p0`).
 2. Branch `<type>/<issue-number>-<slug>`, e.g. `feat/14-ransac-plane-detection`.
 3. Conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `perf:`,
    `test:`, `ci:`, `data:`, `experiment:`).

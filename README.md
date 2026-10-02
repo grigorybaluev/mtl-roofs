@@ -126,5 +126,5 @@ exception is `tests/fixtures/`, which holds a handful of tiny building clips.
 - **v1 — "ML + borough scale":** ML roof typing with ablations against the classical
   pipeline on identical metrics, scaled to a full borough.
 
-[Roadmap](docs/roadmap.md) · [Project board](https://github.com/users/grigorybaluev/projects) ·
+[Roadmap](docs/roadmap.md) · [Milestones](https://github.com/grigorybaluev/mtl-roofs/milestones) ·
 [Architecture decisions](docs/adr/) · [Contributing](CONTRIBUTING.md)

@@ -19,8 +19,9 @@ PostgreSQL, or a system GDAL — see [`CLAUDE.md`](CLAUDE.md) for why.
 
 ## The loop
 
-1. Find an issue in **Ready** on the [project board](https://github.com/users/grigorybaluev/projects),
-   or open one. Issues use forms; pick the right type.
+1. Take the highest-priority open issue in the current
+   [milestone](https://github.com/grigorybaluev/mtl-roofs/milestones) that is not labelled
+   `blocked` or `needs-decision`, or open one. Issues use forms; pick the right type.
 2. Branch: `<type>/<issue-number>-<slug>` — `feat/14-ransac-plane-detection`.
 3. Commit with [Conventional Commits](https://www.conventionalcommits.org/).
 4. Open a PR with `Closes #<n>` and fill in the template.
