@@ -155,6 +155,18 @@ own (`no-match`, `grouped-reference`). Statuses:
 | `grouped-reference` | reference is a merged block |
 | `suspect-temporal` | large uniform height offset; probably changed since 2015 |
 
+Two more fields per row ([ADR 0006](adr/0006-topology-solver-priors.md)):
+
+- **`reason`**, set only with `solver-failed`: `no-convergence` (with the final cost,
+  gradient norm and iterations) or `ill-conditioned` (with the reciprocal condition
+  number).
+- **`warnings`**, a possibly empty list, on any status: conditions that did not fail
+  the building but qualify its result (`sliver-face`, `ill-conditioned-corner`,
+  `prior-conflict`). Definitions are in `docs/topology-solver.md`.
+
+A building's warnings are counted in the report by type, so that a rise in, say,
+`prior-conflict` is visible even when every building is `ok`.
+
 The **failure gallery** shows the worst *N* buildings by RMSE with a diagnosis each.
 A v0 report that only shows successes is not finished.
 
