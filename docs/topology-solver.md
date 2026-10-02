@@ -138,8 +138,9 @@ weighted compromise, not an arbitrary one.
 
 ### Corners
 
-A corner is a set of four or more planes that are pairwise adjacent and meet at one
-point. For each three of them, the planes intersect at a point, provided they're well
+A corner is a set of four or more planes around one point: each is adjacent to at least
+two others in the set. (Opposite faces of a pyramid meet only at the apex, so they are
+not adjacent themselves.) For each three of them, the planes intersect at a point, provided they're well
 conditioned ($\lvert\det[\hat n_a\ \hat n_b\ \hat n_c]\rvert \geq$ `min_corner_det`, 0.1).
 These triple points must lie within `corner_tol_m` (0.5 m) of each other. Their mean
 must lie within the footprint buffered by that distance, and within `corner_tol_m` in
