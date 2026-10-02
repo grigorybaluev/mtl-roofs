@@ -163,8 +163,13 @@ apex.
   `step_angle_deg` (10°) are therefore classified as **steps**. They get no ridge prior
   and take part in no corner, and the extrusion joins them with a vertical face. This is
   15% of adjacent pairs on the fixtures, so it's a common case, not an edge case.
-- **Ill-conditioned triples.** A triple below `min_corner_det` is excluded from corner
-  detection and recorded as an `ill-conditioned-corner` warning.
+- **Ill-conditioned triples.** Three faces below `min_corner_det` meet along nearly
+  parallel lines, not at a point. That is ordinary geometry: a ridge pair plus a
+  shallower face on one side (a mansard break or a shed extension). On the fixtures
+  11 mutually adjacent triples are like this, and none is a lost corner. Such a triple
+  is reported only when it sits inside a set of faces around a point that the other
+  triples locate. That set is skipped with an `ill-conditioned-corner` warning, and a
+  corner of the remaining faces is still used if one exists.
 - **Slivers.** A face whose inliers are narrow across one direction constrains its
   normal poorly about that direction: one eigenvalue of $T_i^\top S_i T_i$ is small.
   When the width across the face, $\sqrt{12\,\lambda_{\min}/N_i}$, is under
@@ -215,7 +220,7 @@ corner points, and $\partial \hat n_i / \partial(a_i, b_i)$ follows from the cha
 | warning | condition |
 |---|---|
 | `sliver-face` | a face under `sliver_width_m` across (above) |
-| `ill-conditioned-corner` | a triple of mutually adjacent planes below `min_corner_det` |
+| `ill-conditioned-corner` | a set of faces around a point, located by its well-conditioned triples, that holds a triple below `min_corner_det` (above) |
 | `prior-conflict` | a plane ends more than `conflict_sigma` (5) evidence standard deviations from its fit, $\lVert r^{\text{fit}}_i \rVert > 5$: the priors and corners overrode its evidence |
 
 The module docstring listed four failure modes before this was written. Where each one
