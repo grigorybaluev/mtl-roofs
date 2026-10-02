@@ -1,8 +1,8 @@
 # Roadmap
 
-Tracked on the [project board](https://github.com/users/grigorybaluev/projects) and in
-[milestones](https://github.com/grigorybaluev/mtl-roofs/milestones). This page is the
-narrative; the board is the truth.
+Tracked in [milestones](https://github.com/grigorybaluev/mtl-roofs/milestones), with
+`priority:*`, `blocked` and `needs-decision` labels. This page is the narrative; the
+milestones are the truth.
 
 ## v0 — "one neighbourhood, honest numbers"
 
