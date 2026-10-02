@@ -24,7 +24,7 @@ from shapely.ops import unary_union
 
 from mtl_roofs.io.footprints import load_footprints
 from mtl_roofs.io.lidar import tile_member
-from mtl_roofs.io.reference import ReferenceBuilding, iter_buildings
+from mtl_roofs.io.reference import ReferenceBuilding, iter_buildings, roof_outline
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw" / "cdn-ndg-03"
@@ -49,12 +49,6 @@ COMPLEX_FACES = 40
 MAX_BYTES = 2 * 1024 * 1024
 
 
-def outline(building: ReferenceBuilding) -> shapely.Geometry:
-    """2D union of a reference building's roof surfaces: its roof outline."""
-    parts = [shapely.Polygon([p[:2] for p in r.points]).buffer(0) for r in building.roofs]
-    return unary_union([p for p in parts if p.area > 0])
-
-
 def label(building: ReferenceBuilding) -> str:
     """Fixture stratum: the evaluation's roof type, or ``complex`` for many faces."""
     return "complex" if len(building.roofs) >= COMPLEX_FACES else building.roof_type()
@@ -63,7 +57,7 @@ def label(building: ReferenceBuilding) -> str:
 def main() -> None:
     """Rebuild every fixture file, the index and the baseline's inventory."""
     buildings = {b.gml_id: b for b in iter_buildings(REFERENCE_GML) if b.roofs}
-    outlines = {gid: outline(b) for gid, b in buildings.items()}
+    outlines = {gid: roof_outline(b) for gid, b in buildings.items()}
     bounds = unary_union(list(outlines.values())).bounds
     footprints = load_footprints(FOOTPRINTS_ZIP, bbox=bounds).set_index("footprint_id")
 

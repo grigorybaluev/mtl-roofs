@@ -15,6 +15,7 @@ import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 from xml.etree import ElementTree
 
 NS = {
@@ -99,6 +100,19 @@ class ReferenceBuilding:
         if steep < 0.60:
             return "mixed"
         return "pitched"
+
+
+def roof_outline(building: ReferenceBuilding) -> Any:  # shapely geometry; shapely is untyped
+    """2D union of a building's roof surfaces: its roof outline in plan.
+
+    Degenerate (zero-area) faces are left out. A building with none left gets an empty
+    geometry.
+    """
+    import shapely
+    from shapely.ops import unary_union
+
+    parts = [shapely.Polygon([p[:2] for p in r.points]).buffer(0) for r in building.roofs]
+    return unary_union([p for p in parts if p.area > 0])
 
 
 def _newell_raw(points: list[Point3]) -> Point3:

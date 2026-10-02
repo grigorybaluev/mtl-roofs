@@ -61,3 +61,23 @@ def test_leaves_no_partial_file_when_the_archive_is_corrupt(tmp_path: Path) -> N
     with pytest.raises((zipfile.BadZipFile, ValueError, OSError)):
         extract_citygml(archive, out)
     assert not list(out.iterdir()) if out.exists() else True
+
+
+def test_roof_outline_is_the_plan_union_of_the_roof_faces() -> None:
+    from mtl_roofs.io.reference import ReferenceBuilding, RoofPolygon, roof_outline
+
+    west = [(0.0, 0.0, 5.0), (5.0, 0.0, 8.0), (5.0, 10.0, 8.0), (0.0, 10.0, 5.0), (0.0, 0.0, 5.0)]
+    east = [(5.0, 0.0, 8.0), (10.0, 0.0, 5.0), (10.0, 10.0, 5.0), (5.0, 10.0, 8.0), (5.0, 0.0, 8.0)]
+    sliver = [(0.0, 0.0, 5.0), (1.0, 0.0, 5.0), (0.0, 0.0, 5.0)]
+    building = ReferenceBuilding(
+        "1", [RoofPolygon("w", west), RoofPolygon("e", east), RoofPolygon("s", sliver)]
+    )
+    outline = roof_outline(building)
+    assert outline.geom_type == "Polygon"
+    assert outline.area == pytest.approx(100.0)
+
+
+def test_roof_outline_of_a_building_without_faces_is_empty() -> None:
+    from mtl_roofs.io.reference import ReferenceBuilding, roof_outline
+
+    assert roof_outline(ReferenceBuilding("1")).is_empty

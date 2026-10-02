@@ -58,6 +58,7 @@ mtl-roofs data plan  -a <area>    # what would be downloaded, no download
 mtl-roofs data fetch -a <area>    # stream + verify only the needed tiles
 mtl-roofs data verify -a <area>   # re-check local artefacts offline, no network
 mtl-roofs data checksums -a <area>  # print the YAML to paste into data/manifest.yaml
+mtl-roofs data load -a <area>     # footprints + reference model into PostGIS (needs db-up)
 mtl-roofs reconstruct -a <area>
 mtl-roofs evaluate    -a <area>
 mtl-roofs export      -a <area>
