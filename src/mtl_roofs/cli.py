@@ -247,6 +247,63 @@ def data_checksums(
         console.print()
 
 
+@data_app.command("load")
+def data_load(
+    area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
+) -> None:
+    """Load an area's footprints and reference model into PostGIS.
+
+    Reads the artefacts `data fetch` left in data/raw/<area>/ and replaces the area's
+    rows. Footprints are those intersecting the area's bbox; reference buildings are
+    every building of the area's reference tiles. Run `data verify` first if the files
+    may have changed. Needs `pixi run db-up`.
+    """
+    from mtl_roofs.io.footprints import load_footprints
+    from mtl_roofs.io.postgis import connect, load_area
+    from mtl_roofs.io.reference import iter_buildings
+
+    plan = _plan_artifacts(area)
+    settings = Settings()
+    raw = settings.raw_dir / plan.study.name
+    paths = {
+        label: [raw / i.member.artifact for i in plan.items if i.label == label]
+        for label in ("footprints", "reference")
+    }
+    missing = [p.name for ps in paths.values() for p in ps if not p.exists()]
+    if missing:
+        console.print(f"[red]not downloaded:[/red] {', '.join(missing)}")
+        console.print(f"[dim]run `mtl-roofs data fetch -a {area}` first[/dim]")
+        raise typer.Exit(code=1)
+
+    bbox = plan.study.bbox
+    (footprints_zip,) = paths["footprints"]
+    footprints = load_footprints(footprints_zip, bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax))
+    buildings = (b for gml in paths["reference"] for b in iter_buildings(gml))
+    with connect(settings) as conn:
+        counts = load_area(conn, plan.study.name, footprints, buildings)
+
+    table = Table("table", "rows", "of which")
+    table.add_row(
+        "footprints", str(counts.footprints), f"{counts.lidar_derived_footprints} LiDAR-derived"
+    )
+    table.add_row(
+        "reference_buildings",
+        str(counts.reference_buildings),
+        f"{counts.grouped_buildings} Groupe*",
+    )
+    table.add_row("reference_roof_surfaces", str(counts.roof_surfaces), "")
+    console.print(table)
+
+    expected = plan.study.expected_buildings
+    if expected is not None and counts.reference_buildings != expected:
+        console.print(
+            f"[bold red]expected {expected} reference buildings, loaded "
+            f"{counts.reference_buildings}[/bold red]"
+        )
+        raise typer.Exit(code=1)
+    console.print("[bold green]done[/bold green]")
+
+
 @app.command()
 def reconstruct(
     area: Annotated[str, typer.Option("--area", "-a")],

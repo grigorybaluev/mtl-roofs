@@ -79,6 +79,7 @@ pixi run mtl-roofs data areas                  # study areas
 pixi run mtl-roofs data plan   -a cdn-ndg-03   # what would be downloaded, and what is pinned
 pixi run mtl-roofs data fetch  -a cdn-ndg-03   # ~1.07 GB, verified against the manifest
 pixi run mtl-roofs data verify -a cdn-ndg-03   # re-check what is on disk, offline
+pixi run mtl-roofs data load   -a cdn-ndg-03   # footprints + reference model into PostGIS
 ```
 
 Every artefact is checked against a SHA-256 pinned in `data/manifest.yaml`. An existing
