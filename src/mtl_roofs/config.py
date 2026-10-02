@@ -7,14 +7,16 @@ so that a run is reproducible from a file rather than from command-line argument
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 from typing import Any, Self
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from mtl_roofs import CRS_EPSG
+from mtl_roofs.geometry.planes import PlaneParams
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AREAS_DIR = REPO_ROOT / "configs" / "areas"
@@ -75,6 +77,19 @@ class StudyArea(BaseModel):
     reference_tiles: list[str] = Field(default_factory=list)
     #: Expected building count, used only as a sanity check on a run.
     expected_buildings: int | None = None
+    #: Plane detection parameters; any field left out keeps its default.
+    planes: PlaneParams = Field(default_factory=PlaneParams)
+
+    @field_validator("planes", mode="before")
+    @classmethod
+    def _known_plane_params(cls, value: Any) -> Any:
+        # A misspelt key would otherwise be dropped silently and the default used.
+        if isinstance(value, dict):
+            unknown = sorted(set(value) - {f.name for f in dataclasses.fields(PlaneParams)})
+            if unknown:
+                msg = f"unknown plane parameter(s) {unknown}"
+                raise ValueError(msg)
+        return value
 
     @classmethod
     def load(cls, name: str, areas_dir: Path | None = None) -> StudyArea:

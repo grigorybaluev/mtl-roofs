@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from mtl_roofs.config import AREAS_DIR, BBox, StudyArea
+from mtl_roofs.geometry.planes import PlaneParams
 
 
 def test_v0_area_loads_and_matches_the_measured_building_count() -> None:
@@ -50,3 +51,20 @@ def test_bbox_area_is_in_square_kilometres() -> None:
 def test_tiles_cover_a_bbox_spanning_a_tile_boundary() -> None:
     bbox = BBox(xmin=291999.0, ymin=5034999.0, xmax=292001.0, ymax=5035001.0)
     assert sorted(bbox.lidar_tiles()) == ["291-5034", "291-5035", "292-5034", "292-5035"]
+
+
+def test_plane_parameters_default_and_override_per_area() -> None:
+    area = StudyArea.load("cdn-ndg-03")
+    assert area.planes == PlaneParams()
+    tuned = StudyArea.model_validate(
+        {**area.model_dump(), "planes": {"threshold": 0.2, "min_inliers": 80}}
+    )
+    assert tuned.planes.threshold == 0.2
+    assert tuned.planes.min_inliers == 80
+    assert tuned.planes.max_slope_deg == PlaneParams().max_slope_deg
+
+
+def test_a_misspelt_plane_parameter_is_an_error() -> None:
+    area = StudyArea.load("cdn-ndg-03")
+    with pytest.raises(ValueError, match="treshold"):
+        StudyArea.model_validate({**area.model_dump(), "planes": {"treshold": 0.2}})
