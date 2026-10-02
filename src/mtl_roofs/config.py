@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Any, Self
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from mtl_roofs import CRS_EPSG
 from mtl_roofs.geometry.planes import PlaneParams
+from mtl_roofs.geometry.topology import TopologyParams
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AREAS_DIR = REPO_ROOT / "configs" / "areas"
@@ -79,15 +80,18 @@ class StudyArea(BaseModel):
     expected_buildings: int | None = None
     #: Plane detection parameters; any field left out keeps its default.
     planes: PlaneParams = Field(default_factory=PlaneParams)
+    #: Topology solver parameters; any field left out keeps its default.
+    topology: TopologyParams = Field(default_factory=TopologyParams)
 
-    @field_validator("planes", mode="before")
+    @field_validator("planes", "topology", mode="before")
     @classmethod
-    def _known_plane_params(cls, value: Any) -> Any:
+    def _known_params(cls, value: Any, info: ValidationInfo) -> Any:
         # A misspelt key would otherwise be dropped silently and the default used.
         if isinstance(value, dict):
-            unknown = sorted(set(value) - {f.name for f in dataclasses.fields(PlaneParams)})
+            model = {"planes": PlaneParams, "topology": TopologyParams}[str(info.field_name)]
+            unknown = sorted(set(value) - {f.name for f in dataclasses.fields(model)})
             if unknown:
-                msg = f"unknown plane parameter(s) {unknown}"
+                msg = f"unknown {info.field_name} parameter(s) {unknown}"
                 raise ValueError(msg)
         return value
 
