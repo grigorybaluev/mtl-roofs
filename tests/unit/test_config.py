@@ -6,6 +6,7 @@ import pytest
 
 from mtl_roofs.config import AREAS_DIR, BBox, StudyArea
 from mtl_roofs.geometry.planes import PlaneParams
+from mtl_roofs.geometry.topology import TopologyParams
 
 
 def test_v0_area_loads_and_matches_the_measured_building_count() -> None:
@@ -68,3 +69,17 @@ def test_a_misspelt_plane_parameter_is_an_error() -> None:
     area = StudyArea.load("cdn-ndg-03")
     with pytest.raises(ValueError, match="treshold"):
         StudyArea.model_validate({**area.model_dump(), "planes": {"treshold": 0.2}})
+
+
+def test_topology_parameters_default_and_override_per_area() -> None:
+    area = StudyArea.load("cdn-ndg-03")
+    assert area.topology == TopologyParams()
+    ablation = StudyArea.model_validate({**area.model_dump(), "topology": {"level_gate_deg": 0}})
+    assert ablation.topology.level_gate_deg == 0
+    assert ablation.topology.azimuth_gate_deg == TopologyParams().azimuth_gate_deg
+
+
+def test_a_misspelt_topology_parameter_is_an_error() -> None:
+    area = StudyArea.load("cdn-ndg-03")
+    with pytest.raises(ValueError, match="unknown topology parameter"):
+        StudyArea.model_validate({**area.model_dump(), "topology": {"level_gate": 0}})
