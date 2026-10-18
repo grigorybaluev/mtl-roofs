@@ -51,9 +51,11 @@ jobs:
             exit 1
           fi
 
+      # No continue-on-error: an exception, or a regression beyond tolerance, fails
+      # the job here. While the baseline is all null, the command writes a report
+      # saying nothing was measured and exits 0 on purpose (#53).
       - name: Run the smoke evaluation
         id: smoke
-        continue-on-error: true
         run: pixi run eval-smoke
 
       - name: Comment the metric table
@@ -65,9 +67,8 @@ jobs:
             const path = '.eval-smoke/report.md';
             const body = fs.existsSync(path)
               ? fs.readFileSync(path, 'utf8')
-              : '### eval-smoke\n\n:construction: The smoke evaluation did not produce a report yet. '
-                + 'The pipeline is still being implemented; this gate becomes enforcing once '
-                + '`mtl-roofs evaluate --smoke` is wired up.';
+              : '### eval-smoke\n\n:x: The smoke evaluation failed without writing a report. '
+                + 'See the job log.';
             const marker = '<!-- eval-smoke -->';
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
@@ -79,9 +80,3 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number, body: payload });
             }
-
-      - name: Fail on regression
-        if: steps.smoke.outcome == 'failure'
-        run: |
-          echo "::error::A headline metric regressed beyond tolerance, or eval-smoke errored."
-          exit 1
