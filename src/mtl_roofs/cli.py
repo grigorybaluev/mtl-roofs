@@ -319,8 +319,23 @@ def evaluate(
     fixtures: Annotated[Path, typer.Option("--fixtures")] = Path("tests/fixtures"),
     out: Annotated[Path, typer.Option("--out")] = Path(".eval-smoke"),
 ) -> None:
-    """Evaluate reconstructions against the reference model."""
-    raise NotImplementedError
+    """Evaluate reconstructions against the reference model.
+
+    With ``--smoke``, run on the fixtures and write ``<out>/report.md`` for the
+    eval-smoke check. While the baseline metrics are ``null`` the report says that
+    nothing was measured and the command exits 0 deliberately; once they are set, a
+    run that cannot produce metrics fails.
+    """
+    from mtl_roofs.evaluation.smoke import baseline_is_set, load_baseline, write_pending_report
+
+    if not smoke:
+        raise NotImplementedError
+
+    if baseline_is_set(load_baseline(fixtures)):
+        console.print("[bold red]the baseline is set but evaluation is not implemented[/bold red]")
+        raise typer.Exit(code=1)
+    report_path = write_pending_report(out, "building matching and RMSE are not implemented yet.")
+    console.print(f"[yellow]nothing measured[/yellow]; wrote {report_path}")
 
 
 @app.command()

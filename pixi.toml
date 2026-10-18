@@ -71,7 +71,7 @@ format = "ruff format src tests && ruff check --fix src tests"
 typecheck = "mypy --strict src"
 test = "pytest tests/unit -v --cov=mtl_roofs --cov-report=term-missing --cov-report=xml"
 test-integration = "pytest tests/integration -v -m integration"
-eval-smoke = "python -m mtl_roofs.cli evaluate --smoke --fixtures tests/fixtures --out .eval-smoke"
+eval-smoke = "python -m mtl_roofs evaluate --smoke --fixtures tests/fixtures --out .eval-smoke"
 db-up = "docker compose up -d --wait"
 db-down = "docker compose down"
 
