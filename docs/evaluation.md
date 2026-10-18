@@ -92,6 +92,38 @@ Reported next to it: the number of footprints with no reference building assigne
 it would have left 32% of buildings unmatched, because 60% of reference buildings
 share a footprint with a neighbour.
 
+### 6. Sampling, scoring set and aggregation
+
+The per-building formulas above leave four things open. They are fixed here (#24).
+
+**The grid.** Cells are 0.5 m squares aligned on multiples of 0.5 m in EPSG:2950, so
+every building and every run uses the same grid. A cell is sampled at its centre. It
+belongs to reference building *B* if its centre lies inside *B*'s roof outline
+**eroded by one cell (0.5 m)**, which keeps the ±30–40 cm footprint edge error out of
+the score. $z^{\text{ref}}_c$ is the **highest** reference roof surface above the
+centre, because the highest surface is the one the LiDAR sees. $z^{\text{pred}}_c$ is the roof
+face of the assigned footprint's reconstruction above the centre. It is defined only
+when that reconstruction is `ok`: a failed reconstruction predicts nothing.
+
+**Who is in which sum.** Every non-grouped reference building assigned to a footprint
+counts in **coverage**, including those whose footprint failed to reconstruct. A
+failure therefore shows as missing coverage, never as a silent omission. **RMSE**
+counts the cells where both surfaces are defined, so it is computed only over
+reconstructed buildings, and coverage says how much that leaves out.
+
+**Overall numbers pool cells, not buildings.** Over the scored set,
+
+$$\mathrm{RMSE} = \sqrt{\frac{\sum_B \sum_{c \in V_B} (z^{\text{pred}}_c - z^{\text{ref}}_c)^2}{\sum_B |V_B|}}, \qquad \mathrm{coverage} = \frac{\sum_B |V_B|}{\sum_B |R_B|}$$
+
+with $R_B$ the cells where $z^{\text{ref}}$ is defined. This is the RMSE over all
+measured roof area, so a large building weighs as much as its area. The **median of
+the per-building RMSEs** is reported next to it, so that a typical house is visible
+too. The orientation median and p90 pool every matched plane pair. Face-count
+agreement is the mean over reconstructed buildings.
+
+**Buildings reconstructed** is the number of assigned, non-grouped reference
+buildings whose footprint's reconstruction is `ok`.
+
 ## Breakdowns
 
 Every headline metric is broken down by:
@@ -102,7 +134,8 @@ Every headline metric is broken down by:
   classifier is scored against, so it must stay reproducible;
 - **building size** — reference roof-outline area `<100`, `100–250`, `250–1000`,
   `≥1000` m²;
-- **point density** — `<5`, `5–10`, `10–20`, `≥20` points/m².
+- **point density** — `<5`, `5–10`, `10–20`, `≥20` points/m²: the roof points the
+  clipper retains on the assigned footprint, per m² of footprint.
 
 Bins are fixed constants in `evaluation/report.py`, not derived from the run, so
 that two runs are comparable.
@@ -114,7 +147,15 @@ Ranked by expected impact.
 1. **Temporal mismatch (largest).** LiDAR is Nov–Dec 2015; the reference is 2016.
    Buildings built, demolished, extended or re-roofed between the two produce large
    errors that are not reconstruction errors. Flagged by a robust height difference
-   over the whole footprint and reported separately.
+   and reported separately. The flag is computed from the **LiDAR, not the
+   reconstruction**, so that excluding flagged buildings can't hide a reconstruction
+   error. Over a building's cells, take the median height of the footprint's retained
+   roof points in each cell, and its difference from $z^{\text{ref}}$. If the median of
+   those differences exceeds **1.5 m** in absolute value, the building is
+   `suspect-temporal`. 1.5 m is well above the two products' combined vertical error
+   (LiDAR ±0.2 m, photogrammetry a few decimetres) and half a storey. A flagged
+   building whose footprint reconstructed keeps its metrics: it is in the raw
+   numbers and left out of the "excluding temporally suspect" ones.
 2. **Synthetic reference walls.** The reference extrapolates walls from roof edges to
    3 m below grade. Only roof surfaces are measured, so **only roofs are scored.**
 3. **Merged building groups.** Reference buildings with ids like `Groupe9637915` are
@@ -141,7 +182,8 @@ Ranked by expected impact.
 Every reference building and every footprint produces a row, including failures. A
 building that could not be reconstructed must be *visible*, not absent. A reference
 building takes the status of its footprint's reconstruction unless it has one of its
-own (`no-match`, `grouped-reference`). Statuses:
+own (`no-match`, `grouped-reference`). `suspect-temporal` only ever replaces `ok`:
+a building whose footprint failed keeps the failure. Statuses:
 
 | status | meaning |
 |---|---|
@@ -176,3 +218,10 @@ A v0 report that only shows successes is not finished.
 compares against `tests/fixtures/baseline_metrics.json` and fails if a headline
 metric regresses beyond the tolerance stored in that file. Tolerances exist because
 RANSAC is stochastic; runs are seeded, but seeds do not survive refactors.
+
+A tolerance is the largest allowed change in the bad direction. RMSE and
+orientation error regress when they rise by more than their tolerance. Coverage, match
+rate and buildings reconstructed regress when they fall by more than its absolute
+value. A metric with no tolerance is reported but never gates. While every baseline
+value is `null` the guard reports and doesn't gate. Once the baseline is set, a run
+that produces no metrics fails.
