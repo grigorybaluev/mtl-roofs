@@ -25,6 +25,7 @@ from mtl_roofs.evaluation.grid import (
 )
 from mtl_roofs.evaluation.matching import assign_buildings
 from mtl_roofs.evaluation.report import BuildingResult
+from mtl_roofs.evaluation.structure import score_structure
 from mtl_roofs.geometry.roof import RoofFace
 from mtl_roofs.io.reference import ReferenceBuilding, roof_outline
 
@@ -143,6 +144,22 @@ def score_building(
     status = footprint.status
     if status == "ok" and offset is not None and abs(offset) > TEMPORAL_THRESHOLD_M:
         status = "suspect-temporal"
+    structure: dict[str, Any] = {}
+    if footprint.status == "ok":
+        score = score_structure(footprint.faces, [r.points for r in building.roofs], outline)
+        structure = {
+            "orientation_errors_deg": score.angles_deg,
+            "orientation_median_deg": (
+                float(np.median(score.angles_deg)) if score.angles_deg else None
+            ),
+            "n_pred_planes": score.n_pred_planes,
+            "n_ref_planes": score.n_ref_planes,
+            "n_unmatched_pred": score.n_unmatched_pred,
+            "n_unmatched_ref": score.n_unmatched_ref,
+            "n_pred_faces": score.n_pred_faces,
+            "n_ref_faces": score.n_ref_faces,
+            "face_count_agreement": score.face_count_agreement,
+        }
     return BuildingResult(
         building_id=building.gml_id,
         footprint_id=footprint.footprint_id,
@@ -160,6 +177,7 @@ def score_building(
         temporal_offset_m=offset,
         reason=footprint.reason,
         warnings=footprint.warnings,
+        **structure,
     )
 
 
@@ -179,18 +197,34 @@ def summarise(rows: Sequence[BuildingResult]) -> dict[str, Any]:
     per_building = [r.rmse_m for r in assigned if r.rmse_m is not None]
     shares = [r.share for r in assigned if r.share is not None]
     per_footprint = Counter(r.footprint_id for r in assigned)
+    angles = [a for r in reconstructed for a in r.orientation_errors_deg]
+    agreement = [
+        r.face_count_agreement for r in reconstructed if r.face_count_agreement is not None
+    ]
+
+    def total(name: str) -> int:
+        return sum(getattr(r, name) or 0 for r in reconstructed)
+
     return {
         "vertical_rmse_m": (
             float(np.sqrt(sum(r.sum_sq_m2 for r in assigned) / n_valid)) if n_valid else None
         ),
         "median_building_rmse_m": float(np.median(per_building)) if per_building else None,
         "coverage": n_valid / n_ref if n_ref else None,
+        "orientation_error_median_deg": float(np.median(angles)) if angles else None,
+        "orientation_error_p90_deg": float(np.quantile(angles, 0.9)) if angles else None,
+        "face_count_agreement": float(np.mean(agreement)) if agreement else None,
         "match_rate": len(assigned) / len(candidates) if candidates else None,
         "buildings_reconstructed": len(reconstructed),
         "n_buildings": len(reference),
         "n_assigned": len(assigned),
         "n_grouped": len(reference) - len(candidates),
         "n_no_reference": len(rows) - len(reference),
+        "n_plane_pairs": len(angles),
+        "n_unmatched_pred_planes": total("n_unmatched_pred"),
+        "n_unmatched_ref_planes": total("n_unmatched_ref"),
+        "n_pred_faces": total("n_pred_faces"),
+        "n_ref_faces": total("n_ref_faces"),
         "share_quantiles": (
             [float(q) for q in np.quantile(shares, [0.0, 0.1, 0.5])] if shares else None
         ),

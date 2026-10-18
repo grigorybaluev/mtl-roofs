@@ -28,6 +28,15 @@ class BuildingResult:
         rmse_m: Vertical RMSE over the valid cells; ``None`` with no valid cell.
         coverage: ``n_valid_cells / n_ref_cells``; ``None`` with no reference cell.
         temporal_offset_m: Median LiDAR-minus-reference height over the cells.
+        orientation_errors_deg: Orientation error of each matched plane pair.
+        orientation_median_deg: Their median; ``None`` with no matched pair.
+        n_pred_planes: Predicted planes overlapping the outline.
+        n_ref_planes: Reference planes.
+        n_unmatched_pred: Predicted planes with no reference partner.
+        n_unmatched_ref: Reference planes with no predicted partner.
+        n_pred_faces: Predicted faces counted for the building.
+        n_ref_faces: Reference roof faces.
+        face_count_agreement: ``min / max`` of the face counts.
         reason: The reconstruction's failure reason, if any.
         warnings: The topology solver's warnings for the footprint.
     """
@@ -46,6 +55,15 @@ class BuildingResult:
     rmse_m: float | None = None
     coverage: float | None = None
     temporal_offset_m: float | None = None
+    orientation_errors_deg: tuple[float, ...] = ()
+    orientation_median_deg: float | None = None
+    n_pred_planes: int | None = None
+    n_ref_planes: int | None = None
+    n_unmatched_pred: int | None = None
+    n_unmatched_ref: int | None = None
+    n_pred_faces: int | None = None
+    n_ref_faces: int | None = None
+    face_count_agreement: float | None = None
     reason: str = ""
     warnings: tuple[str, ...] = ()
 
