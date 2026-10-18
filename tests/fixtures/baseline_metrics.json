@@ -1,9 +1,9 @@
 {
   "_comment": [
-    "Baseline for the eval-smoke regression guard.",
-    "Metric values are null until `mtl-roofs evaluate --smoke` is implemented; the",
-    "guard reports but does not gate while they are null. Populating them is part of",
-    "the 'Building matching + vertical RMSE' issue.",
+    "Baseline for the eval-smoke regression guard, from `pixi run eval-smoke` on main at",
+    "ba6ba5c (#81). The guard fails a PR whose headline metric moves beyond its tolerance.",
+    "Definitions: docs/evaluation.md. Roof types are the geometric rule of",
+    "docs/evaluation.md (flat / mixed / pitched); the fixtures' 'complex' seeds fall in those.",
     "CHANGING THIS FILE IS ITS OWN PULL REQUEST. eval-smoke.yml fails any PR that",
     "edits it alongside code in src/mtl_roofs/{geometry,evaluation,ml}/."
   ],
@@ -25,38 +25,33 @@
   },
   "metrics": {
     "overall": {
-      "vertical_rmse_m": null,
-      "orientation_error_median_deg": null,
-      "orientation_error_p90_deg": null,
-      "coverage": null,
-      "face_count_agreement": null,
-      "match_rate": null,
-      "buildings_reconstructed": null
+      "vertical_rmse_m": 0.4106,
+      "median_building_rmse_m": 0.3454,
+      "orientation_error_median_deg": 0.6473,
+      "orientation_error_p90_deg": 4.7447,
+      "coverage": 1.0,
+      "face_count_agreement": 0.2188,
+      "match_rate": 1.0,
+      "buildings_reconstructed": 35
     },
     "by_roof_type": {
       "flat": {
-        "n": 13,
-        "vertical_rmse_m": null,
-        "orientation_error_median_deg": null,
-        "coverage": null
+        "n": 14,
+        "vertical_rmse_m": 0.4214,
+        "orientation_error_median_deg": 0.0049,
+        "coverage": 1.0
       },
       "mixed": {
-        "n": 7,
-        "vertical_rmse_m": null,
-        "orientation_error_median_deg": null,
-        "coverage": null
+        "n": 8,
+        "vertical_rmse_m": 0.3859,
+        "orientation_error_median_deg": 0.5078,
+        "coverage": 1.0
       },
       "pitched": {
-        "n": 10,
-        "vertical_rmse_m": null,
-        "orientation_error_median_deg": null,
-        "coverage": null
-      },
-      "complex": {
-        "n": 5,
-        "vertical_rmse_m": null,
-        "orientation_error_median_deg": null,
-        "coverage": null
+        "n": 13,
+        "vertical_rmse_m": 0.4078,
+        "orientation_error_median_deg": 1.1256,
+        "coverage": 1.0
       }
     }
   }
