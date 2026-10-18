@@ -255,3 +255,14 @@ def test_a_partition_that_is_not_noded_is_reported_not_watertight() -> None:
     flat = _tilted(16.0, 0.0, 0.0)
     extrusion = extrude_lod2(_faces((west, flat), (south, flat), (north, flat)), GROUND)
     assert extrusion.status is ExtrusionStatus.NOT_WATERTIGHT
+
+
+def test_the_floor_follows_the_downhill_ground() -> None:
+    # Ground falling 3 m across the lot: the floor must be at the low side, not the middle.
+    from mtl_roofs.io.lidar import PointSet
+    from mtl_roofs.pipeline import ground_height
+
+    x = np.linspace(0.0, 20.0, 201)
+    ground = np.column_stack([X0 + x, np.full_like(x, Y0), 50.0 - 0.15 * x])
+    points = PointSet(ground, np.full(len(x), 2, dtype=np.uint8))
+    assert ground_height(points) == pytest.approx(47.15, abs=0.02)
