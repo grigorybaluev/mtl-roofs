@@ -41,6 +41,7 @@ class Status(Enum):
     NO_PLANES = "no-planes"
     SOLVER_FAILED = "solver-failed"
     NOT_WATERTIGHT = "not-watertight"
+    ERROR = "error"
 
 
 @dataclass(frozen=True, slots=True)

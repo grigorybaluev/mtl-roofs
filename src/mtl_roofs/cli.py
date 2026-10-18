@@ -306,10 +306,120 @@ def data_load(
 
 @app.command()
 def reconstruct(
-    area: Annotated[str, typer.Option("--area", "-a")],
+    area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
+    force: Annotated[
+        bool, typer.Option("--force", help="Discard earlier results and start over.")
+    ] = False,
+    limit: Annotated[
+        int | None, typer.Option("--limit", help="Reconstruct at most this many footprints.")
+    ] = None,
 ) -> None:
-    """Reconstruct LOD2 roofs for a study area."""
-    raise NotImplementedError
+    """Reconstruct every footprint of a study area into PostGIS and a CSV.
+
+    Needs `data load` (footprints in PostGIS) and the area's LiDAR tiles. Resumable:
+    footprints that already have a row are skipped. Every footprint gets a row with
+    its failure-log status, and an exception on one is recorded as `error` without
+    stopping the run. The run log, with wall-clock time and peak memory, is written
+    to data/processed/<area>/runs/.
+    """
+    import time
+
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TimeRemainingColumn
+
+    from mtl_roofs.batch import (
+        USED_CLASSES,
+        RunLog,
+        beyond_coverage,
+        covering_bbox,
+        lidar_paths,
+        new_run_id,
+        peak_memory_mb,
+        process,
+        write_csv,
+        write_log,
+    )
+    from mtl_roofs.io.lidar import PointIndex
+    from mtl_roofs.io.postgis import (
+        RECONSTRUCTION_COLUMNS,
+        area_footprints,
+        clear_reconstructions,
+        completed_footprints,
+        connect,
+        init_schema,
+        reconstruction_rows,
+        save_reconstruction,
+    )
+    from mtl_roofs.pipeline import PipelineParams, Reconstruction
+
+    started = time.perf_counter()
+    study = StudyArea.load(area)
+    settings = Settings()
+    params = PipelineParams(planes=study.planes, topology=study.topology)
+    run = RunLog(run_id=new_run_id(), area=area)
+    out = settings.processed_dir / area
+
+    # Autocommit: each footprint is committed as it is saved, so a run is resumable.
+    with connect(settings, autocommit=True) as conn:
+        init_schema(conn)
+        footprints = area_footprints(conn, area)
+        if not footprints:
+            console.print(
+                f"[red]no footprints for {area}[/red]; run `mtl-roofs data load -a {area}`"
+            )
+            raise typer.Exit(code=1)
+        if force:
+            clear_reconstructions(conn, area)
+        done = completed_footprints(conn, area)
+        todo = [f for f in footprints if f[0] not in done][:limit]
+        run.n_footprints, run.n_skipped = len(footprints), len(done)
+        console.print(
+            f"{area}: {len(footprints)} footprints, {len(done)} already done, "
+            f"{len(todo)} to reconstruct"
+        )
+
+        if todo:
+            tiles = study.bbox.lidar_tiles()
+            paths = lidar_paths(settings.raw_dir / area, tiles)
+            run.beyond_coverage = beyond_coverage(todo, tiles)
+            if run.beyond_coverage:
+                console.print(
+                    f"[yellow]{len(run.beyond_coverage)} footprint(s) reach outside the "
+                    "area's LiDAR tiles[/yellow]; listed in the run log"
+                )
+            bbox = covering_bbox(todo)
+            load_start = time.perf_counter()
+            with console.status("reading LiDAR ..."):
+                index = PointIndex.from_las(paths, bbox, USED_CLASSES)
+            run.load_seconds = time.perf_counter() - load_start
+            run.n_points = len(index)
+            console.print(f"{len(index):,} points in {run.load_seconds:.0f} s")
+
+            def save(footprint_id: str, result: Reconstruction, seconds: float) -> None:
+                save_reconstruction(conn, area, footprint_id, result, seconds, run.run_id)
+
+            columns = (BarColumn(), MofNCompleteColumn(), TimeRemainingColumn())
+            with Progress(*Progress.get_default_columns()[:1], *columns, console=console) as bar:
+                task = bar.add_task("reconstructing", total=len(todo))
+                counts = process(todo, index, params, save, on_done=lambda *_: bar.advance(task))
+            run.n_processed = sum(counts.values())
+            run.status_counts = dict(sorted(counts.items()))
+
+        write_csv(
+            out / "reconstructions.csv", RECONSTRUCTION_COLUMNS, reconstruction_rows(conn, area)
+        )
+
+    run.seconds = time.perf_counter() - started
+    run.peak_memory_mb = peak_memory_mb()
+    write_log(out / "runs" / f"{run.run_id}.json", run)
+
+    table = Table("status", "footprints", title=f"run {run.run_id}")
+    for status, n in run.status_counts.items():
+        table.add_row(status, str(n))
+    console.print(table)
+    console.print(
+        f"{run.n_processed} reconstructed, {run.n_skipped} skipped in {run.seconds:.0f} s, "
+        f"peak memory {run.peak_memory_mb:.0f} MB; rows in {out / 'reconstructions.csv'}"
+    )
 
 
 @app.command()
