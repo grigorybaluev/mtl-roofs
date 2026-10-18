@@ -168,6 +168,9 @@ def write_rows(rows: list[BuildingResult], path: Path) -> None:
         for row in rows:
             record = dataclasses.asdict(row)
             record["warnings"] = ";".join(row.warnings)
+            record["orientation_errors_deg"] = ";".join(
+                f"{a:.3f}" for a in row.orientation_errors_deg
+            )
             writer.writerow(record)
 
 
@@ -217,14 +220,22 @@ def _report(baseline: dict[str, Any], result: SmokeResult, by_type: dict[str, An
         "",
         "Statuses: " + ", ".join(f"`{k}` {v}" for k, v in o["status_counts"].items()),
         "",
-        "| roof type | buildings | RMSE (m) | coverage | reconstructed |",
-        "|---|---:|---:|---:|---:|",
+        f"Faces: {o['n_pred_faces']} predicted, {o['n_ref_faces']} reference. Planes: "
+        f"{o['n_plane_pairs']} matched pairs, {o['n_unmatched_pred_planes']} predicted and "
+        f"{o['n_unmatched_ref_planes']} reference unmatched.",
+        "",
+        "| roof type | buildings | RMSE (m) | coverage | orientation, median (°) "
+        "| face-count agreement | reconstructed |",
+        "|---|---:|---:|---:|---:|---:|---:|",
     ]
     for roof_type, summary in by_type.items():
         lines.append(
             f"| {roof_type} | {summary['n_buildings']} | "
             f"{_fmt('{:.3f}', summary['vertical_rmse_m'])} | "
-            f"{_fmt('{:.3f}', summary['coverage'])} | {summary['buildings_reconstructed']} |"
+            f"{_fmt('{:.3f}', summary['coverage'])} | "
+            f"{_fmt('{:.2f}', summary['orientation_error_median_deg'])} | "
+            f"{_fmt('{:.3f}', summary['face_count_agreement'])} | "
+            f"{summary['buildings_reconstructed']} |"
         )
     return "\n".join(lines) + "\n"
 
