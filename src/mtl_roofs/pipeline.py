@@ -85,16 +85,23 @@ class Reconstruction:
     extrusion: Extrusion | None = None
 
 
+#: Percentile of the ground-class heights around a footprint taken as its floor.
+FLOOR_PERCENTILE = 5.0
+
+
 def ground_height(points: PointSet) -> float:
-    """Floor height for a footprint: the median of its ground-class points.
+    """Floor height for a footprint: a low percentile of its ground-class points.
 
     The points around a footprint include a margin of context (2 m in the fixtures),
-    which is where the ground returns are. With none at all, the lowest point is
-    used instead.
+    which is where the ground returns are. On a slope the ground differs by metres
+    from one side of a building to the other, and a floor at the median can sit above
+    the downhill eaves (#84). The 5th percentile puts the floor at the downhill side,
+    while ignoring the odd stray low return. Walls are not scored, so this only
+    changes the solid below the roof. With no ground points, the lowest point is used.
     """
     ground = points.xyz[points.classification == GROUND_CLASS, 2]
     if len(ground):
-        return float(np.median(ground))
+        return float(np.percentile(ground, FLOOR_PERCENTILE))
     return float(points.xyz[:, 2].min()) if len(points) else float("nan")
 
 
