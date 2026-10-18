@@ -16,17 +16,24 @@ and two written by the batch reconstruction (#21):
   solid as a ``POLYHEDRALSURFACE Z`` and the semantic kind of each of its surfaces;
 * ``roof_faces``: the roof partition, one 2D polygon per face with its plane.
 
+and one written by the evaluation (#24, #26):
+
+* ``building_results``: one row per reference building, and per footprint with none
+  assigned, with its status, its assignment (footprint and share; the stored
+  mapping ADR 0005 asks for) and its metrics.
+
 Every row carries the study area it was loaded for. Loading an area replaces that
 area's rows in one transaction, so re-running never duplicates and a failed load
 leaves the previous one in place. It also drops the area's reconstructions, which
 were made from the replaced inputs.
 
 Nothing here assigns reference buildings to footprints. That mapping is produced by
-the matching stage and stored by it (ADR 0005, #24).
+the evaluation and stored in ``building_results`` (ADR 0005, #24).
 """
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -37,9 +44,11 @@ import shapely
 
 from mtl_roofs import CRS_EPSG
 from mtl_roofs.config import Settings
+from mtl_roofs.evaluation.report import BuildingResult
 from mtl_roofs.io.reference import ReferenceBuilding, roof_outline
 
 if TYPE_CHECKING:
+    from mtl_roofs.evaluation.evaluate import FootprintOutcome
     from mtl_roofs.geometry.extrude import Solid
     from mtl_roofs.pipeline import Reconstruction
 
@@ -121,11 +130,42 @@ CREATE TABLE IF NOT EXISTS roof_faces (
     FOREIGN KEY (area, footprint_id) REFERENCES reconstructions ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS roof_faces_geom_gist ON roof_faces USING gist (geom);
+
+CREATE TABLE IF NOT EXISTS building_results (
+    area                   text    NOT NULL,
+    building_id            text    NOT NULL,
+    footprint_id           text,
+    status                 text    NOT NULL,
+    roof_type              text,
+    outline_area_m2        double precision NOT NULL,
+    share                  double precision,
+    point_density          double precision,
+    lidar_derived          boolean,
+    n_ref_cells            integer NOT NULL,
+    n_valid_cells          integer NOT NULL,
+    sum_sq_m2              double precision NOT NULL,
+    rmse_m                 double precision,
+    coverage               double precision,
+    temporal_offset_m      double precision,
+    orientation_errors_deg double precision[] NOT NULL,
+    orientation_median_deg double precision,
+    n_pred_planes          integer,
+    n_ref_planes           integer,
+    n_unmatched_pred       integer,
+    n_unmatched_ref        integer,
+    n_pred_faces           integer,
+    n_ref_faces            integer,
+    face_count_agreement   double precision,
+    reason                 text    NOT NULL,
+    warnings               text[]  NOT NULL,
+    PRIMARY KEY (area, building_id)
+);
 """
 
 #: Tables holding per-area rows, children before parents so a delete never orphans.
 #: Reloading an area's inputs also drops its reconstructions, which would be stale.
 AREA_TABLES = (
+    "building_results",
     "roof_faces",
     "reconstructions",
     "reference_roof_surfaces",
@@ -369,6 +409,104 @@ def reconstruction_rows(conn: psycopg.Connection[Any], area: str) -> list[tuple[
         " WHERE area = %s ORDER BY footprint_id",
         (area,),
     ).fetchall()
+
+
+def area_outcomes(conn: psycopg.Connection[Any], area: str) -> list[FootprintOutcome]:
+    """Every footprint of an area with its reconstruction, as the evaluation reads them.
+
+    A footprint with no reconstruction row has not been processed; it is returned with
+    status ``not-run`` so that the evaluation still lists it rather than drop it.
+    """
+    from mtl_roofs.evaluation.evaluate import FootprintOutcome
+    from mtl_roofs.geometry.planes import Plane
+    from mtl_roofs.geometry.roof import RoofFace
+
+    faces: dict[str, list[RoofFace]] = {}
+    for fid, plane_index, nx, ny, nz, d, wkb in conn.execute(
+        "SELECT footprint_id, plane_index, nx, ny, nz, d, ST_AsBinary(geom) FROM roof_faces"
+        " WHERE area = %s ORDER BY footprint_id, face",
+        (area,),
+    ):
+        plane = Plane((nx, ny, nz), d)
+        faces.setdefault(fid, []).append(RoofFace(plane_index, plane, shapely.from_wkb(bytes(wkb))))
+
+    rows = conn.execute(
+        "SELECT f.footprint_id, f.lidar_derived, ST_AsBinary(f.geom), r.status, r.reason,"
+        " r.warnings, r.density FROM footprints f LEFT JOIN reconstructions r"
+        " USING (area, footprint_id) WHERE f.area = %s ORDER BY f.footprint_id",
+        (area,),
+    ).fetchall()
+    return [
+        FootprintOutcome(
+            footprint_id=fid,
+            polygon=shapely.from_wkb(bytes(wkb)),
+            status=status or "not-run",
+            faces=faces.get(fid, []),
+            density=density or 0.0,
+            lidar_derived=bool(derived),
+            reason=reason or "",
+            warnings=tuple(warnings or ()),
+        )
+        for fid, derived, wkb, status, reason, warnings, density in rows
+    ]
+
+
+def area_buildings(conn: psycopg.Connection[Any], area: str) -> list[ReferenceBuilding]:
+    """An area's reference buildings with their 3D roof polygons, by ``gml:id``."""
+    from mtl_roofs.io.reference import RoofPolygon
+
+    roofs: dict[str, list[RoofPolygon]] = {}
+    for gml_id, surface_id, wkb in conn.execute(
+        "SELECT gml_id, surface_id, ST_AsBinary(geom) FROM reference_roof_surfaces"
+        " WHERE area = %s ORDER BY gml_id, ordinal",
+        (area,),
+    ):
+        ring = shapely.from_wkb(bytes(wkb)).exterior.coords
+        roofs.setdefault(gml_id, []).append(
+            RoofPolygon(surface_id, [(x, y, z) for x, y, z in ring])
+        )
+    ids = conn.execute(
+        "SELECT gml_id FROM reference_buildings WHERE area = %s ORDER BY gml_id", (area,)
+    ).fetchall()
+    return [ReferenceBuilding(gml_id, roofs.get(gml_id, [])) for (gml_id,) in ids]
+
+
+def save_building_results(
+    conn: psycopg.Connection[Any], area: str, rows: Iterable[BuildingResult]
+) -> int:
+    """Replace an area's per-building evaluation rows; returns how many were written."""
+    names = [f.name for f in dataclasses.fields(BuildingResult)]
+    n = 0
+    with conn.transaction():
+        init_schema(conn)
+        conn.execute("DELETE FROM building_results WHERE area = %s", (area,))
+        with (
+            conn.cursor() as cur,
+            cur.copy(f"COPY building_results (area, {', '.join(names)}) FROM STDIN") as copy,
+        ):
+            for row in rows:
+                record = dataclasses.asdict(row)
+                record["orientation_errors_deg"] = list(row.orientation_errors_deg)
+                record["warnings"] = list(row.warnings)
+                copy.write_row((area, *(record[name] for name in names)))
+                n += 1
+    return n
+
+
+def load_building_results(conn: psycopg.Connection[Any], area: str) -> list[BuildingResult]:
+    """An area's per-building evaluation rows, as :func:`save_building_results` wrote them."""
+    names = [f.name for f in dataclasses.fields(BuildingResult)]
+    rows = conn.execute(
+        f"SELECT {', '.join(names)} FROM building_results WHERE area = %s ORDER BY building_id",
+        (area,),
+    ).fetchall()
+    results = []
+    for row in rows:
+        record = dict(zip(names, row, strict=True))
+        record["orientation_errors_deg"] = tuple(record["orientation_errors_deg"] or ())
+        record["warnings"] = tuple(record["warnings"] or ())
+        results.append(BuildingResult(**record))
+    return results
 
 
 def _polyhedral_wkt(solid: Solid) -> str:

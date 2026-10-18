@@ -220,3 +220,41 @@ def test_the_batch_connection_commits_each_footprint_as_it_is_saved(conn: Any) -
         save_reconstruction(batch, TEST_AREA, fid, Reconstruction(Status.NO_PLANES), 0.1, "r")
         # Still open: another connection must already see the row.
         assert count(conn, "reconstructions") == 1
+
+def test_the_area_evaluation_reads_back_what_the_fixtures_score(conn: Any) -> None:
+    """#26: footprints, faces and reference read from PostGIS score as the fixtures do,
+    and the stored rows read back unchanged."""
+    from mtl_roofs.batch import footprint_points
+    from mtl_roofs.evaluation.evaluate import evaluate
+    from mtl_roofs.io.lidar import PointIndex, read_points
+    from mtl_roofs.io.postgis import (
+        area_buildings,
+        area_outcomes,
+        load_area,
+        load_building_results,
+        save_building_results,
+        save_reconstruction,
+    )
+    from mtl_roofs.pipeline import reconstruct_footprint
+
+    load_area(conn, TEST_AREA, fixture_footprints(), fixture_buildings())
+    fid = "fp-2926302-50356572"
+    polygon = {o.footprint_id: o.polygon for o in area_outcomes(conn, TEST_AREA)}[fid]
+    index = PointIndex.build(read_points(FIXTURES / "points" / f"{fid}.laz"))
+    result = reconstruct_footprint(footprint_points(index, polygon), polygon)
+    save_reconstruction(conn, TEST_AREA, fid, result, 1.0, "test-run")
+
+    outcomes = area_outcomes(conn, TEST_AREA)
+    assert {o.status for o in outcomes} == {"ok", "not-run"}
+    done = [o for o in outcomes if o.footprint_id == fid]
+    assert len(done[0].faces) == len(result.faces)
+
+    buildings = area_buildings(conn, TEST_AREA)
+    assert len(buildings) == len(fixture_buildings())
+    rows = evaluate(done, [b for b in buildings if not b.is_grouped])
+    scored = [r for r in rows if r.footprint_id == fid and r.status == "ok"]
+    assert len(scored) == 4
+    assert all(r.rmse_m is not None for r in scored)
+
+    save_building_results(conn, TEST_AREA, rows)
+    assert load_building_results(conn, TEST_AREA) == sorted(rows, key=lambda r: r.building_id)
