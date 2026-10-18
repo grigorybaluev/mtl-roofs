@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import shlex
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -47,16 +48,15 @@ def test_eval_smoke_task_writes_a_report(tmp_path: Path) -> None:
     assert "eval-smoke" in report
 
 
-def test_eval_smoke_fails_when_the_baseline_is_set_and_nothing_is_measured(
-    tmp_path: Path,
-) -> None:
-    """Once the baseline has numbers, a run that measures nothing must not pass."""
+def test_eval_smoke_fails_on_a_regression(tmp_path: Path) -> None:
+    """Once the baseline has numbers, the guard must be able to fail."""
     fixtures = tmp_path / "fixtures"
-    fixtures.mkdir()
-    baseline = json.loads((ROOT / "tests" / "fixtures" / "baseline_metrics.json").read_text())
-    baseline["metrics"]["overall"]["vertical_rmse_m"] = 0.5
-    (fixtures / "baseline_metrics.json").write_text(json.dumps(baseline))
-    result = subprocess.run(
-        _smoke_command(tmp_path / "smoke", fixtures), cwd=ROOT, capture_output=True
-    )
+    shutil.copytree(ROOT / "tests" / "fixtures", fixtures)
+    path = fixtures / "baseline_metrics.json"
+    baseline = json.loads(path.read_text())
+    baseline["metrics"]["overall"]["vertical_rmse_m"] = 0.0  # unreachable
+    path.write_text(json.dumps(baseline))
+    out = tmp_path / "smoke"
+    result = subprocess.run(_smoke_command(out, fixtures), cwd=ROOT, capture_output=True)
     assert result.returncode != 0
+    assert "Regression" in (out / "report.md").read_text()

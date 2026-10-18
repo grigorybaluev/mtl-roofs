@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 import numpy as np
+import numpy.typing as npt
 import shapely
 
 from mtl_roofs.geometry.clip import GROUND_CLASS, ClipParams, ClipStatus, clip_footprint
@@ -28,6 +29,8 @@ from mtl_roofs.geometry.topology import (
 from mtl_roofs.io.lidar import PointSet
 
 log = logging.getLogger(__name__)
+
+FloatArray = npt.NDArray[np.float64]
 
 
 class Status(Enum):
@@ -62,6 +65,7 @@ class Reconstruction:
         warnings: The topology solver's warnings, by kind.
         n_points: Roof points retained by the clipper.
         density: Roof points per m² of footprint.
+        roof_points: ``(n, 3)`` the retained roof points.
         ground_z: Floor height of the solid.
         topology: The solved planes, once that stage ran.
         faces: The roof partition; empty unless the solver succeeded.
@@ -73,6 +77,7 @@ class Reconstruction:
     warnings: list[str] = field(default_factory=list)
     n_points: int = 0
     density: float = 0.0
+    roof_points: FloatArray = field(default_factory=lambda: np.empty((0, 3)))
     ground_z: float = float("nan")
     topology: TopologyResult | None = None
     faces: list[RoofFace] = field(default_factory=list)
@@ -110,6 +115,7 @@ def reconstruct_footprint(
             status,
             n_points=clipped.n_points,
             density=clipped.density,
+            roof_points=clipped.roof.xyz,
             ground_z=ground_height(points),
             **kwargs,  # type: ignore[arg-type]
         )
