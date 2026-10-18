@@ -7,21 +7,47 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class BuildingResult:
-    """One row of the per-building results table."""
+    """One row of the per-building results table: every building gets one.
+
+    Reference buildings are keyed by ``gml:id``; a footprint with no reference
+    building assigned gets a ``no-reference`` row keyed by its footprint id.
+
+    Attributes:
+        building_id: ``gml:id``, or the footprint id for a ``no-reference`` row.
+        footprint_id: The assigned footprint; ``None`` for ``no-match`` and
+            ``grouped-reference``.
+        status: Failure-log status (``docs/evaluation.md``).
+        roof_type: ``flat``, ``mixed`` or ``pitched`` from the reference model.
+        outline_area_m2: Reference roof-outline area (the size breakdown axis).
+        share: Share of the outline inside the assigned footprint.
+        point_density: Roof points per m² of the assigned footprint.
+        lidar_derived: Whether the assigned footprint was derived from the LiDAR.
+        n_ref_cells: Grid cells where the reference surface is defined.
+        n_valid_cells: Of those, cells where the prediction is defined too.
+        sum_sq_m2: Sum of squared height differences over the valid cells.
+        rmse_m: Vertical RMSE over the valid cells; ``None`` with no valid cell.
+        coverage: ``n_valid_cells / n_ref_cells``; ``None`` with no reference cell.
+        temporal_offset_m: Median LiDAR-minus-reference height over the cells.
+        reason: The reconstruction's failure reason, if any.
+        warnings: The topology solver's warnings for the footprint.
+    """
 
     building_id: str
-    matched: bool
-    roof_type: str
-    n_points: int
-    point_density: float
-    footprint_area: float
-    rmse: float | None = None
+    footprint_id: str | None
+    status: str
+    roof_type: str | None = None
+    outline_area_m2: float = 0.0
+    share: float | None = None
+    point_density: float | None = None
+    lidar_derived: bool | None = None
+    n_ref_cells: int = 0
+    n_valid_cells: int = 0
+    sum_sq_m2: float = 0.0
+    rmse_m: float | None = None
     coverage: float | None = None
-    mean_orientation_error: float | None = None
-    predicted_faces: int | None = None
-    reference_faces: int | None = None
-    status: str = "ok"
-    note: str = ""
+    temporal_offset_m: float | None = None
+    reason: str = ""
+    warnings: tuple[str, ...] = ()
 
 
 def density_bin(density: float) -> str:

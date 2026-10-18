@@ -27,13 +27,10 @@ def test_unmatched_building_still_produces_a_row() -> None:
     """Failures must appear in the results table, not vanish from it."""
     row = BuildingResult(
         building_id="1585788",
-        matched=False,
-        roof_type="pitched",
-        n_points=0,
-        point_density=0.0,
-        footprint_area=120.0,
+        footprint_id=None,
         status="no-match",
-        note="no reference building within IoU threshold",
+        roof_type="pitched",
+        outline_area_m2=120.0,
     )
-    assert row.rmse is None
-    assert not row.matched
+    assert row.rmse_m is None
+    assert row.coverage is None
