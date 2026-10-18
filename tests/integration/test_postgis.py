@@ -221,6 +221,7 @@ def test_the_batch_connection_commits_each_footprint_as_it_is_saved(conn: Any) -
         # Still open: another connection must already see the row.
         assert count(conn, "reconstructions") == 1
 
+
 def test_the_area_evaluation_reads_back_what_the_fixtures_score(conn: Any) -> None:
     """#26: footprints, faces and reference read from PostGIS score as the fixtures do,
     and the stored rows read back unchanged."""
