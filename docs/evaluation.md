@@ -196,10 +196,12 @@ a building whose footprint failed keeps the failure. Statuses:
 | `not-watertight` | extrusion produced a non-closed solid |
 | `grouped-reference` | reference is a merged block |
 | `suspect-temporal` | large uniform height offset; probably changed since 2015 |
+| `error` | an unexpected exception; the run went on, the message is recorded as the `reason` |
 
 Two more fields per row ([ADR 0006](adr/0006-topology-solver-priors.md)):
 
-- **`reason`**, set only with `solver-failed`: `no-convergence` (with the final cost,
+- **`reason`**, set with `error` (the exception) and `not-watertight` (the checks that
+  failed), and with `solver-failed`: `no-convergence` (with the final cost,
   gradient norm and iterations) or `ill-conditioned` (with the reciprocal condition
   number).
 - **`warnings`**, a possibly empty list, on any status: conditions that did not fail
