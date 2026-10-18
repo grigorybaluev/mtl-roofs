@@ -37,6 +37,20 @@ altered in that window produce real errors that are not reconstruction errors; r
 are reported both raw and with those buildings flagged. See
 [`docs/evaluation.md`](docs/evaluation.md).
 
+Every number comes from four commands, after `pixi run db-up` and
+`mtl-roofs data fetch` / `data load -a cdn-ndg-03`:
+
+```bash
+mtl-roofs reconstruct -a cdn-ndg-03   # every footprint, with its status, into PostGIS
+mtl-roofs evaluate    -a cdn-ndg-03   # every reference building scored
+mtl-roofs report      -a cdn-ndg-03   # breakdown tables and the failure gallery
+```
+
+They write to `data/processed/cdn-ndg-03/`: `reconstructions.csv` and `buildings.csv`
+(one row per footprint and per building, failures included), `report/breakdown.md`
+(every metric by roof type, size and point density), and `report/gallery/gallery.md`,
+**the failure gallery**: the worst buildings by RMSE, each with a diagnosis.
+
 ## Pipeline
 
 ```mermaid

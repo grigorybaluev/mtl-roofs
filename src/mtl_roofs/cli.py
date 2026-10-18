@@ -9,7 +9,7 @@ import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 from urllib.request import Request, urlopen
 
 import typer
@@ -30,6 +30,9 @@ from mtl_roofs.manifest import (
     sha256_file,
     verify_or_raise,
 )
+
+if TYPE_CHECKING:
+    from mtl_roofs.evaluation.evaluate import FootprintOutcome
 
 app = typer.Typer(
     name="mtl-roofs",
@@ -463,25 +466,79 @@ def export(
 @app.command()
 def report(
     area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
+    gallery: Annotated[
+        int, typer.Option("--gallery", help="Worst buildings to render; 0 for none.")
+    ] = 20,
 ) -> None:
-    """Write the breakdown report: every headline metric by roof type, size and density.
+    """Write the breakdown report and the failure gallery.
 
-    Reads the per-building rows `evaluate -a` stored, and writes breakdown.md and
-    breakdown.csv to data/processed/<area>/report/.
+    Reads the per-building rows `evaluate -a` stored. Writes breakdown.md and
+    breakdown.csv to data/processed/<area>/report/, and the gallery of the worst
+    buildings by RMSE, with a diagnosis each, to report/gallery/.
     """
     from mtl_roofs.evaluation.breakdown import write_breakdown
-    from mtl_roofs.io.postgis import connect, load_building_results
+    from mtl_roofs.evaluation.gallery import write_gallery
+    from mtl_roofs.io.postgis import (
+        area_buildings,
+        area_outcomes,
+        connect,
+        load_building_results,
+    )
 
     settings = Settings()
+    out = settings.processed_dir / area / "report"
     with connect(settings) as conn:
         rows = load_building_results(conn, area)
-    if not rows:
-        console.print(f"[red]no evaluation for {area}[/red]; run `mtl-roofs evaluate -a {area}`")
-        raise typer.Exit(code=1)
-    md, csv_path = write_breakdown(
-        rows, settings.processed_dir / area / "report", f"Evaluation of {area}"
-    )
-    console.print(f"wrote {md} and {csv_path}")
+        if not rows:
+            console.print(
+                f"[red]no evaluation for {area}[/red]; run `mtl-roofs evaluate -a {area}`"
+            )
+            raise typer.Exit(code=1)
+        md, csv_path = write_breakdown(rows, out, f"Evaluation of {area}")
+        console.print(f"wrote {md} and {csv_path}")
+        if gallery <= 0:
+            return
+        outcomes = area_outcomes(conn, area)
+        buildings = {b.gml_id: b for b in area_buildings(conn, area)}
+    outcomes = _with_roof_points(outcomes, StudyArea.load(area), settings)
+    with console.status(f"rendering the {gallery} worst buildings ..."):
+        page = write_gallery(
+            rows,
+            {o.footprint_id: o for o in outcomes},
+            buildings,
+            out / "gallery",
+            n=gallery,
+            title=f"Failure gallery: {area}",
+        )
+    console.print(f"wrote {page}")
+
+
+def _with_roof_points(
+    outcomes: list[FootprintOutcome], study: StudyArea, settings: Settings
+) -> list[FootprintOutcome]:
+    """The footprints with their clipped LiDAR roof points, read from the area's tiles."""
+    from rich.progress import Progress
+
+    from mtl_roofs.batch import USED_CLASSES, footprint_points, lidar_paths
+    from mtl_roofs.geometry.clip import clip_footprint
+    from mtl_roofs.io.lidar import PointIndex
+
+    bbox = study.bbox
+    with console.status("reading LiDAR ..."):
+        index = PointIndex.from_las(
+            lidar_paths(settings.raw_dir / study.name, bbox.lidar_tiles()),
+            (bbox.xmin - 50, bbox.ymin - 50, bbox.xmax + 50, bbox.ymax + 50),
+            USED_CLASSES,
+        )
+    result = []
+    with Progress(console=console) as bar:
+        task = bar.add_task("clipping roof points", total=len(outcomes))
+        for o in outcomes:
+            points = footprint_points(index, o.polygon)
+            roof = clip_footprint(points, o.polygon).roof.xyz if len(points) else points.xyz
+            result.append(dataclasses.replace(o, roof_points=roof))
+            bar.advance(task)
+    return result
 
 
 def _evaluate_area(area: str) -> None:
@@ -489,14 +546,10 @@ def _evaluate_area(area: str) -> None:
     import json
     import time
 
-    from rich.progress import Progress
-
-    from mtl_roofs.batch import USED_CLASSES, footprint_points, lidar_paths, write_csv
+    from mtl_roofs.batch import write_csv
     from mtl_roofs.evaluation.evaluate import evaluate as score
     from mtl_roofs.evaluation.evaluate import summarise
     from mtl_roofs.evaluation.report import BuildingResult
-    from mtl_roofs.geometry.clip import clip_footprint
-    from mtl_roofs.io.lidar import PointIndex
     from mtl_roofs.io.postgis import area_buildings, area_outcomes, connect, save_building_results
 
     started = time.perf_counter()
@@ -516,21 +569,7 @@ def _evaluate_area(area: str) -> None:
 
         # The temporal flag compares the LiDAR itself with the reference, so the roof
         # points are clipped again; the reconstruction is not re-run.
-        bbox = study.bbox
-        with console.status("reading LiDAR ..."):
-            index = PointIndex.from_las(
-                lidar_paths(settings.raw_dir / area, bbox.lidar_tiles()),
-                (bbox.xmin - 50, bbox.ymin - 50, bbox.xmax + 50, bbox.ymax + 50),
-                USED_CLASSES,
-            )
-        with Progress(console=console) as bar:
-            task = bar.add_task("clipping roof points", total=len(outcomes))
-            for i, o in enumerate(outcomes):
-                points = footprint_points(index, o.polygon)
-                roof = clip_footprint(points, o.polygon).roof.xyz if len(points) else points.xyz
-                outcomes[i] = dataclasses.replace(o, roof_points=roof)
-                bar.advance(task)
-        del index
+        outcomes = _with_roof_points(outcomes, study, settings)
 
         with console.status(f"scoring {len(buildings)} reference buildings ..."):
             rows = score(outcomes, buildings)
