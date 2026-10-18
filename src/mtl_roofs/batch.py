@@ -172,13 +172,15 @@ def peak_memory_mb() -> float:
 
 
 def write_csv(path: Path, columns: Sequence[str], rows: Iterable[Sequence[Any]]) -> None:
-    """Write rows to CSV; list values are joined with ``;``."""
+    """Write rows to CSV; list and tuple values are joined with ``;``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(columns)
         for row in rows:
-            writer.writerow([";".join(v) if isinstance(v, list) else v for v in row])
+            writer.writerow(
+                [";".join(map(str, v)) if isinstance(v, list | tuple) else v for v in row]
+            )
 
 
 def write_log(path: Path, run: RunLog) -> None:

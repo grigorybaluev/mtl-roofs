@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -439,7 +440,11 @@ def evaluate(
     from mtl_roofs.evaluation.smoke import run_smoke
 
     if not smoke:
-        raise NotImplementedError
+        if not area:
+            console.print("[red]give --area, or --smoke for the fixtures[/red]")
+            raise typer.Exit(code=2)
+        _evaluate_area(area)
+        return
 
     result = run_smoke(fixtures, out)
     console.print((out / "report.md").read_text())
@@ -457,10 +462,112 @@ def export(
 
 @app.command()
 def report(
-    area: Annotated[str, typer.Option("--area", "-a")],
+    area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
 ) -> None:
-    """Write the evaluation breakdown report."""
-    raise NotImplementedError
+    """Write the breakdown report: every headline metric by roof type, size and density.
+
+    Reads the per-building rows `evaluate -a` stored, and writes breakdown.md and
+    breakdown.csv to data/processed/<area>/report/.
+    """
+    from mtl_roofs.evaluation.breakdown import write_breakdown
+    from mtl_roofs.io.postgis import connect, load_building_results
+
+    settings = Settings()
+    with connect(settings) as conn:
+        rows = load_building_results(conn, area)
+    if not rows:
+        console.print(f"[red]no evaluation for {area}[/red]; run `mtl-roofs evaluate -a {area}`")
+        raise typer.Exit(code=1)
+    md, csv_path = write_breakdown(
+        rows, settings.processed_dir / area / "report", f"Evaluation of {area}"
+    )
+    console.print(f"wrote {md} and {csv_path}")
+
+
+def _evaluate_area(area: str) -> None:
+    """Score every reference building of an area and store the rows (`evaluate -a`)."""
+    import json
+    import time
+
+    from rich.progress import Progress
+
+    from mtl_roofs.batch import USED_CLASSES, footprint_points, lidar_paths, write_csv
+    from mtl_roofs.evaluation.evaluate import evaluate as score
+    from mtl_roofs.evaluation.evaluate import summarise
+    from mtl_roofs.evaluation.report import BuildingResult
+    from mtl_roofs.geometry.clip import clip_footprint
+    from mtl_roofs.io.lidar import PointIndex
+    from mtl_roofs.io.postgis import area_buildings, area_outcomes, connect, save_building_results
+
+    started = time.perf_counter()
+    study = StudyArea.load(area)
+    settings = Settings()
+    out = settings.processed_dir / area
+    with connect(settings, autocommit=True) as conn:
+        outcomes = area_outcomes(conn, area)
+        buildings = area_buildings(conn, area)
+        missing = [o.footprint_id for o in outcomes if o.status == "not-run"]
+        if missing:
+            console.print(
+                f"[red]{len(missing)} footprints have no reconstruction[/red]; "
+                f"run `mtl-roofs reconstruct -a {area}` first"
+            )
+            raise typer.Exit(code=1)
+
+        # The temporal flag compares the LiDAR itself with the reference, so the roof
+        # points are clipped again; the reconstruction is not re-run.
+        bbox = study.bbox
+        with console.status("reading LiDAR ..."):
+            index = PointIndex.from_las(
+                lidar_paths(settings.raw_dir / area, bbox.lidar_tiles()),
+                (bbox.xmin - 50, bbox.ymin - 50, bbox.xmax + 50, bbox.ymax + 50),
+                USED_CLASSES,
+            )
+        with Progress(console=console) as bar:
+            task = bar.add_task("clipping roof points", total=len(outcomes))
+            for i, o in enumerate(outcomes):
+                points = footprint_points(index, o.polygon)
+                roof = clip_footprint(points, o.polygon).roof.xyz if len(points) else points.xyz
+                outcomes[i] = dataclasses.replace(o, roof_points=roof)
+                bar.advance(task)
+        del index
+
+        with console.status(f"scoring {len(buildings)} reference buildings ..."):
+            rows = score(outcomes, buildings)
+        save_building_results(conn, area, rows)
+
+    names = [f.name for f in dataclasses.fields(BuildingResult)]
+    write_csv(
+        out / "buildings.csv",
+        names,
+        ([getattr(r, name) for name in names] for r in rows),
+    )
+    overall = summarise(rows)
+    by_type = {
+        t: summarise([r for r in rows if r.roof_type == t]) for t in ("flat", "mixed", "pitched")
+    }
+    (out / "metrics.json").write_text(
+        json.dumps({"overall": overall, "by_roof_type": by_type}, indent=2) + "\n"
+    )
+
+    table = Table("metric", "value")
+    for key in (
+        "vertical_rmse_m",
+        "median_building_rmse_m",
+        "coverage",
+        "orientation_error_median_deg",
+        "orientation_error_p90_deg",
+        "face_count_agreement",
+        "match_rate",
+        "buildings_reconstructed",
+        "n_buildings",
+        "n_no_reference",
+    ):
+        value = overall[key]
+        table.add_row(key, "—" if value is None else f"{value:.4g}")
+    console.print(table)
+    console.print("statuses: " + ", ".join(f"{k} {v}" for k, v in overall["status_counts"].items()))
+    console.print(f"done in {time.perf_counter() - started:.0f} s; rows in {out / 'buildings.csv'}")
 
 
 # ----------------------------------------------------------------- planning

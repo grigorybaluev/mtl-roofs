@@ -1,4 +1,4 @@
-"""Per-building results and the breakdown report."""
+"""Per-building results and the fixed bins of the breakdown report."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def density_bin(density: float) -> str:
 
 
 def size_bin(area_m2: float) -> str:
-    """Bucket a footprint area (m²) for the breakdown report."""
+    """Bucket a reference roof-outline area (m²) for the breakdown report."""
     if area_m2 < 100:
         return "<100"
     if area_m2 < 250:
@@ -92,11 +92,3 @@ def size_bin(area_m2: float) -> str:
     if area_m2 < 1000:
         return "250-1000"
     return ">=1000"
-
-
-def write_breakdown(*_args: object, **_kwargs: object) -> None:
-    """Write the Markdown + CSV breakdown report.
-
-    Not implemented yet: tracked by the "Breakdown report" issue.
-    """
-    raise NotImplementedError
