@@ -129,3 +129,105 @@ def read_header(path: Path) -> LasHeader:
     """Read the LAS public header from a local file."""
     with path.open("rb") as handle:
         return parse_las_header(handle.read(_LAS_HEADER_MIN))
+
+
+@dataclass(frozen=True, slots=True)
+class PointIndex:
+    """Points of a study area, bucketed on a coarse grid for fast window queries.
+
+    A whole area is ~30 million points; a footprint needs a few thousand. Points are
+    sorted by bucket once, so a window query only touches the buckets it overlaps.
+
+    Attributes:
+        points: All points, sorted by bucket.
+        bucket_m: Bucket size in metres.
+        keys: Sorted unique bucket keys present.
+        starts: Start offset of each key's points in ``points``.
+    """
+
+    points: PointSet
+    bucket_m: float
+    keys: npt.NDArray[np.int64]
+    starts: npt.NDArray[np.intp]
+
+    @classmethod
+    def from_las(
+        cls,
+        paths: list[Path],
+        bbox: tuple[float, float, float, float],
+        keep_classes: frozenset[int] | None = None,
+        bucket_m: float = 20.0,
+        chunk_size: int = 2_000_000,
+    ) -> PointIndex:
+        """Read the points of ``paths`` inside ``bbox``, streaming each file in chunks.
+
+        Args:
+            paths: LAS or LAZ files.
+            bbox: ``(xmin, ymin, xmax, ymax)`` to keep, EPSG:2950.
+            keep_classes: Classification codes to keep; all if ``None``.
+            bucket_m: Bucket size of the index.
+            chunk_size: Points read at a time, which bounds the memory a tile needs.
+        """
+        import laspy
+
+        xmin, ymin, xmax, ymax = bbox
+        xyz_parts: list[npt.NDArray[np.float64]] = []
+        cls_parts: list[npt.NDArray[np.uint8]] = []
+        for path in paths:
+            with laspy.open(path) as reader:
+                for chunk in reader.chunk_iterator(chunk_size):
+                    x, y = np.asarray(chunk.x), np.asarray(chunk.y)
+                    classes = np.asarray(chunk.classification, dtype=np.uint8)
+                    keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
+                    if keep_classes is not None:
+                        keep &= np.isin(classes, list(keep_classes))
+                    xyz_parts.append(np.column_stack([x[keep], y[keep], np.asarray(chunk.z)[keep]]))
+                    cls_parts.append(classes[keep])
+        xyz = np.concatenate(xyz_parts) if xyz_parts else np.empty((0, 3))
+        classes = np.concatenate(cls_parts) if cls_parts else np.empty(0, dtype=np.uint8)
+        return cls.build(PointSet(xyz.astype(np.float64), classes), bucket_m)
+
+    @classmethod
+    def build(cls, points: PointSet, bucket_m: float = 20.0) -> PointIndex:
+        """Index points already in memory."""
+        key = _bucket_key(points.xyz[:, 0], points.xyz[:, 1], bucket_m)
+        order = np.argsort(key, kind="stable")
+        key = key[order]
+        keys, starts = np.unique(key, return_index=True)
+        sorted_points = PointSet(points.xyz[order], points.classification[order])
+        return cls(sorted_points, bucket_m, keys, starts.astype(np.intp))
+
+    def __len__(self) -> int:
+        """Number of indexed points."""
+        return len(self.points)
+
+    def query(self, xmin: float, ymin: float, xmax: float, ymax: float) -> PointSet:
+        """The points inside a window, in no particular order."""
+        bx = np.arange(np.floor(xmin / self.bucket_m), np.floor(xmax / self.bucket_m) + 1)
+        by = np.arange(np.floor(ymin / self.bucket_m), np.floor(ymax / self.bucket_m) + 1)
+        wanted = _bucket_key(
+            np.repeat(bx, len(by)) * self.bucket_m,
+            np.tile(by, len(bx)) * self.bucket_m,
+            self.bucket_m,
+        )
+        pos = np.searchsorted(self.keys, wanted)
+        present = (pos < len(self.keys)) & (
+            self.keys[np.minimum(pos, len(self.keys) - 1)] == wanted
+        )
+        ends = np.r_[self.starts[1:], len(self.points)]
+        ranges = [np.arange(self.starts[p], ends[p]) for p in pos[present]]
+        idx = np.concatenate(ranges) if ranges else np.empty(0, dtype=np.intp)
+        xyz = self.points.xyz[idx]
+        inside = (
+            (xyz[:, 0] >= xmin) & (xyz[:, 0] <= xmax) & (xyz[:, 1] >= ymin) & (xyz[:, 1] <= ymax)
+        )
+        return PointSet(xyz[inside], self.points.classification[idx][inside])
+
+
+def _bucket_key(
+    x: npt.NDArray[np.float64], y: npt.NDArray[np.float64], bucket_m: float
+) -> npt.NDArray[np.int64]:
+    """One integer per bucket: column and row packed into 64 bits."""
+    col = np.floor(np.asarray(x) / bucket_m).astype(np.int64)
+    row = np.floor(np.asarray(y) / bucket_m).astype(np.int64)
+    return (col << 32) + row

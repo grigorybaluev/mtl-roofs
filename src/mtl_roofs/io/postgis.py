@@ -1,8 +1,8 @@
 """PostGIS store for a study area's footprints and reference model (#14).
 
 Downstream stages query these tables instead of re-reading a 100 MB shapefile archive
-and 87 MB of CityGML per tile. Three tables, every geometry column in EPSG:2950 with a
-GiST index:
+and 87 MB of CityGML per tile. Three input tables, every geometry column in EPSG:2950
+with a GiST index:
 
 * ``footprints``: ``CARTO-BAT-TOIT`` roof outlines, keyed by the project's
   ``footprint_id`` (ADR 0005), with the layer's per-feature provenance;
@@ -10,9 +10,16 @@ GiST index:
   blocks flagged rather than dropped;
 * ``reference_roof_surfaces``: each 3D roof polygon of each reference building.
 
+and two written by the batch reconstruction (#21):
+
+* ``reconstructions``: one row per footprint with its failure-log status, the
+  solid as a ``POLYHEDRALSURFACE Z`` and the semantic kind of each of its surfaces;
+* ``roof_faces``: the roof partition, one 2D polygon per face with its plane.
+
 Every row carries the study area it was loaded for. Loading an area replaces that
 area's rows in one transaction, so re-running never duplicates and a failed load
-leaves the previous one in place.
+leaves the previous one in place. It also drops the area's reconstructions, which
+were made from the replaced inputs.
 
 Nothing here assigns reference buildings to footprints. That mapping is produced by
 the matching stage and stored by it (ADR 0005, #24).
@@ -22,14 +29,19 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import numpy as np
 import psycopg
 import shapely
 
 from mtl_roofs import CRS_EPSG
 from mtl_roofs.config import Settings
 from mtl_roofs.io.reference import ReferenceBuilding, roof_outline
+
+if TYPE_CHECKING:
+    from mtl_roofs.geometry.extrude import Solid
+    from mtl_roofs.pipeline import Reconstruction
 
 #: Idempotent DDL. Tables are only ever created here, never altered in place.
 SCHEMA_SQL = f"""
@@ -73,10 +85,69 @@ CREATE TABLE IF NOT EXISTS reference_roof_surfaces (
 );
 CREATE INDEX IF NOT EXISTS reference_roof_surfaces_geom_gist
     ON reference_roof_surfaces USING gist (geom);
+
+CREATE TABLE IF NOT EXISTS reconstructions (
+    area          text     NOT NULL,
+    footprint_id  text     NOT NULL,
+    status        text     NOT NULL,
+    reason        text     NOT NULL,
+    warnings      text[]   NOT NULL,
+    n_points      integer  NOT NULL,
+    density       double precision NOT NULL,
+    ground_z      double precision,
+    n_planes      integer  NOT NULL,
+    n_faces       integer  NOT NULL,
+    volume_m3     double precision,
+    seconds       double precision NOT NULL,
+    run_id        text     NOT NULL,
+    surface_kinds text[],
+    solid         geometry(PolyhedralSurfaceZ, {CRS_EPSG}),
+    PRIMARY KEY (area, footprint_id),
+    FOREIGN KEY (area, footprint_id) REFERENCES footprints ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS reconstructions_solid_gist ON reconstructions USING gist (solid);
+
+CREATE TABLE IF NOT EXISTS roof_faces (
+    area         text    NOT NULL,
+    footprint_id text    NOT NULL,
+    face         integer NOT NULL,
+    plane_index  integer NOT NULL,
+    nx           double precision NOT NULL,
+    ny           double precision NOT NULL,
+    nz           double precision NOT NULL,
+    d            double precision NOT NULL,
+    geom         geometry(Polygon, {CRS_EPSG}) NOT NULL,
+    PRIMARY KEY (area, footprint_id, face),
+    FOREIGN KEY (area, footprint_id) REFERENCES reconstructions ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS roof_faces_geom_gist ON roof_faces USING gist (geom);
 """
 
 #: Tables holding per-area rows, children before parents so a delete never orphans.
-AREA_TABLES = ("reference_roof_surfaces", "reference_buildings", "footprints")
+#: Reloading an area's inputs also drops its reconstructions, which would be stale.
+AREA_TABLES = (
+    "roof_faces",
+    "reconstructions",
+    "reference_roof_surfaces",
+    "reference_buildings",
+    "footprints",
+)
+
+#: Columns of ``reconstructions`` that make up its CSV export, in order.
+RECONSTRUCTION_COLUMNS = (
+    "footprint_id",
+    "status",
+    "reason",
+    "warnings",
+    "n_points",
+    "density",
+    "ground_z",
+    "n_planes",
+    "n_faces",
+    "volume_m3",
+    "seconds",
+    "run_id",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,9 +161,21 @@ class LoadCounts:
     roof_surfaces: int
 
 
-def connect(settings: Settings | None = None) -> psycopg.Connection[tuple[Any, ...]]:
-    """Open a connection to the configured database."""
-    return psycopg.connect((settings or Settings()).dsn(), connect_timeout=10)
+def connect(
+    settings: Settings | None = None, autocommit: bool = False
+) -> psycopg.Connection[tuple[Any, ...]]:
+    """Open a connection to the configured database.
+
+    Args:
+        settings: Defaults to :class:`~mtl_roofs.config.Settings`.
+        autocommit: Make each ``conn.transaction()`` block a transaction of its own.
+            Without it, the first statement opens a transaction that lasts until the
+            connection closes, and the blocks inside it are only savepoints: a long
+            batch would then commit nothing until it ended.
+    """
+    return psycopg.connect(
+        (settings or Settings()).dsn(), connect_timeout=10, autocommit=autocommit
+    )
 
 
 def init_schema(conn: psycopg.Connection[Any]) -> None:
@@ -188,6 +271,115 @@ def load_area(
         grouped_buildings=n_grouped,
         roof_surfaces=n_surfaces,
     )
+
+
+def area_footprints(conn: psycopg.Connection[Any], area: str) -> list[tuple[str, bool, Any]]:
+    """An area's footprints as ``(footprint_id, lidar_derived, polygon)``, by id."""
+    rows = conn.execute(
+        "SELECT footprint_id, lidar_derived, ST_AsBinary(geom) FROM footprints"
+        " WHERE area = %s ORDER BY footprint_id",
+        (area,),
+    ).fetchall()
+    return [(fid, bool(derived), shapely.from_wkb(bytes(wkb))) for fid, derived, wkb in rows]
+
+
+def completed_footprints(conn: psycopg.Connection[Any], area: str) -> set[str]:
+    """Footprints of an area that already have a reconstruction row."""
+    rows = conn.execute(
+        "SELECT footprint_id FROM reconstructions WHERE area = %s", (area,)
+    ).fetchall()
+    return {fid for (fid,) in rows}
+
+
+def clear_reconstructions(conn: psycopg.Connection[Any], area: str) -> None:
+    """Delete an area's reconstructions (and, by cascade, their roof faces)."""
+    with conn.transaction():
+        init_schema(conn)
+        conn.execute("DELETE FROM reconstructions WHERE area = %s", (area,))
+
+
+def save_reconstruction(
+    conn: psycopg.Connection[Any],
+    area: str,
+    footprint_id: str,
+    result: Reconstruction,
+    seconds: float,
+    run_id: str,
+) -> None:
+    """Write one footprint's reconstruction, replacing any earlier one, in one transaction."""
+    solid = result.extrusion.solid if result.extrusion is not None else None
+    n_planes = len(result.topology.planes) if result.topology is not None else 0
+    with conn.transaction():
+        conn.execute(
+            "DELETE FROM reconstructions WHERE area = %s AND footprint_id = %s",
+            (area, footprint_id),
+        )
+        conn.execute(
+            "INSERT INTO reconstructions (area, footprint_id, status, reason, warnings,"
+            " n_points, density, ground_z, n_planes, n_faces, volume_m3, seconds, run_id,"
+            " surface_kinds, solid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,"
+            " %s, %s, %s, ST_GeomFromText(%s, %s))",
+            (
+                area,
+                footprint_id,
+                result.status.value,
+                result.reason,
+                list(result.warnings),
+                result.n_points,
+                result.density,
+                None if np.isnan(result.ground_z) else result.ground_z,
+                n_planes,
+                len(result.faces),
+                solid.volume() if solid is not None else None,
+                seconds,
+                run_id,
+                [surface.kind.value for surface in solid.surfaces] if solid else None,
+                _polyhedral_wkt(solid) if solid is not None else None,
+                CRS_EPSG,
+            ),
+        )
+        with (
+            conn.cursor() as cur,
+            cur.copy(
+                "COPY roof_faces (area, footprint_id, face, plane_index, nx, ny, nz, d, geom)"
+                " FROM STDIN"
+            ) as copy,
+        ):
+            for i, face in enumerate(result.faces):
+                nx, ny, nz = face.plane.normal
+                copy.write_row(
+                    (
+                        area,
+                        footprint_id,
+                        i,
+                        face.plane_index,
+                        nx,
+                        ny,
+                        nz,
+                        face.plane.offset,
+                        _ewkb(face.polygon),
+                    )
+                )
+
+
+def reconstruction_rows(conn: psycopg.Connection[Any], area: str) -> list[tuple[Any, ...]]:
+    """An area's reconstruction rows, :data:`RECONSTRUCTION_COLUMNS` in order, by id."""
+    return conn.execute(
+        f"SELECT {', '.join(RECONSTRUCTION_COLUMNS)} FROM reconstructions"
+        " WHERE area = %s ORDER BY footprint_id",
+        (area,),
+    ).fetchall()
+
+
+def _polyhedral_wkt(solid: Solid) -> str:
+    """A solid as ``POLYHEDRALSURFACE Z`` WKT, each ring closed, 0.1 mm precision."""
+
+    def ring(ids: list[int]) -> str:
+        pts = solid.vertices[[*ids, ids[0]]]
+        return "(" + ", ".join(f"{x:.4f} {y:.4f} {z:.4f}" for x, y, z in pts) + ")"
+
+    surfaces = ("(" + ", ".join(ring(r) for r in s.rings) + ")" for s in solid.surfaces)
+    return "POLYHEDRALSURFACE Z (" + ", ".join(surfaces) + ")"
 
 
 def _ewkb(geom: Any) -> str:

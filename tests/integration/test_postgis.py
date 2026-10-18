@@ -16,6 +16,13 @@ pytestmark = pytest.mark.integration
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 TEST_AREA = "it-fixtures"
+TABLES_WITH_GEOMETRY = [
+    "footprints",
+    "reference_buildings",
+    "reference_roof_surfaces",
+    "reconstructions",
+    "roof_faces",
+]
 
 
 @pytest.fixture
@@ -97,9 +104,9 @@ def test_every_geometry_column_is_2950_with_a_gist_index(conn: Any) -> None:
     columns = conn.execute(
         "SELECT f_table_name, f_geometry_column, srid FROM geometry_columns"
         " WHERE f_table_name = ANY(%s)",
-        (["footprints", "reference_buildings", "reference_roof_surfaces"],),
+        (TABLES_WITH_GEOMETRY,),
     ).fetchall()
-    assert len(columns) == 3
+    assert len(columns) == len(TABLES_WITH_GEOMETRY)
     assert {srid for _, _, srid in columns} == {2950}
     for table, column, _ in columns:
         indexed = conn.execute(
@@ -160,3 +167,56 @@ def test_real_area_loads_the_expected_building_count(conn: Any) -> None:
     assert counts.reference_buildings == study.expected_buildings == 1109
     assert count(conn, "reference_buildings") == 1109
     assert count(conn, "footprints") == counts.footprints > 0
+
+
+def test_a_reconstruction_round_trips_as_a_closed_solid(conn: Any) -> None:
+    """#21: a saved solid is a closed polyhedral surface to PostGIS too, and re-saving
+    a footprint replaces its row and faces."""
+    from mtl_roofs.batch import footprint_points
+    from mtl_roofs.io.lidar import PointIndex, read_points
+    from mtl_roofs.io.postgis import (
+        area_footprints,
+        completed_footprints,
+        load_area,
+        save_reconstruction,
+    )
+    from mtl_roofs.pipeline import reconstruct_footprint
+
+    load_area(conn, TEST_AREA, fixture_footprints(), fixture_buildings())
+    # ST_IsClosed reads only each surface's exterior ring, so it calls a solid open
+    # when a roof face has a hole (a chimney face inside a flat roof). Our own
+    # edge-parity check counts every ring; here a footprint without holes is used.
+    fid = "fp-2926302-50356572"
+    polygon = {f: p for f, _, p in area_footprints(conn, TEST_AREA)}[fid]
+    index = PointIndex.build(read_points(FIXTURES / "points" / f"{fid}.laz"))
+    result = reconstruct_footprint(footprint_points(index, polygon), polygon)
+    for _ in range(2):
+        save_reconstruction(conn, TEST_AREA, fid, result, 1.0, "test-run")
+
+    assert completed_footprints(conn, TEST_AREA) == {fid}
+    status, closed, n_faces, volume = conn.execute(
+        "SELECT status, ST_IsClosed(solid), n_faces, volume_m3 FROM reconstructions"
+        " WHERE area = %s AND footprint_id = %s",
+        (TEST_AREA, fid),
+    ).fetchone()
+    assert status == "ok"
+    assert closed
+    assert n_faces == len(result.faces) == count(conn, "roof_faces")
+    assert volume == pytest.approx(result.extrusion.solid.volume())
+
+    # Reloading the inputs drops the reconstructions made from them.
+    load_area(conn, TEST_AREA, fixture_footprints(), fixture_buildings())
+    assert count(conn, "reconstructions") == count(conn, "roof_faces") == 0
+
+
+def test_the_batch_connection_commits_each_footprint_as_it_is_saved(conn: Any) -> None:
+    """#21: a run that dies half way keeps what it saved, so a re-run resumes."""
+    from mtl_roofs.io.postgis import connect, load_area, save_reconstruction
+    from mtl_roofs.pipeline import Reconstruction, Status
+
+    load_area(conn, TEST_AREA, fixture_footprints(), fixture_buildings())
+    fid = "fp-2926302-50356572"
+    with connect(autocommit=True) as batch:
+        save_reconstruction(batch, TEST_AREA, fid, Reconstruction(Status.NO_PLANES), 0.1, "r")
+        # Still open: another connection must already see the row.
+        assert count(conn, "reconstructions") == 1
