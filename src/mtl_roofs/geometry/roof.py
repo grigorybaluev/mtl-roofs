@@ -6,7 +6,7 @@ run. Extrusion (:mod:`mtl_roofs.geometry.extrude`) and the evaluation's height g
 both read the same partition, so the surface that is scored is the surface that is
 exported.
 
-The partition is built in four steps:
+The partition is built in five steps:
 
 1. **Label a grid.** Every ``cell_m`` cell touching the footprint is given to the plane
    that best explains the LiDAR there: among the planes with an inlier within
@@ -26,6 +26,15 @@ The partition is built in four steps:
 
 Boundaries left between near-parallel planes (``step_angle_deg``) are not snapped:
 the faces are at different heights and the extrusion joins them with a vertical wall.
+
+5. **Resolve saddles.** Where four faces meet at one vertex with their heights
+   alternating around it (high, low, high, low), the extrusion's walls would all
+   share the vertical edge between the two heights there, and the solid would not be
+   a manifold (#84). Such a vertex is split: one of its low faces, between two
+   higher ones, is given a vertex of its own ``saddle_split_m`` inside it, and the two
+   higher faces meet along the short new edge. A vertex with at most three faces
+   around it can't have the problem. No height changes, so every face stays planar,
+   and the footprint outline never moves.
 """
 
 from __future__ import annotations
@@ -64,6 +73,9 @@ class RoofParams:
         snap_m: Largest move of a boundary vertex onto a plane intersection.
         step_angle_deg: Planes closer than this to parallel are never snapped
             together; matches the topology solver's step threshold.
+        saddle_split_m: Length of the edge that splits a saddle vertex.
+        height_tol_m: Heights closer than this at one vertex are equal; matches the
+            extrusion's vertex merging.
     """
 
     cell_m: float = 0.25
@@ -75,6 +87,8 @@ class RoofParams:
     simplify_m: float = 0.5
     snap_m: float = 1.0
     step_angle_deg: float = 10.0
+    saddle_split_m: float = 0.05
+    height_tol_m: float = 1e-4
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +152,7 @@ def partition_roof(
         RoofFace(int(owner), planes[owner][0], shapely.Polygon(poly))
         for poly, owner in zip(polygons, owners, strict=True)
     ]
-    return _snap(footprint, faces, p)
+    return _resolve_saddles(footprint, _snap(footprint, faces, p), p)
 
 
 # ------------------------------------------------------------------ labelling
@@ -461,6 +475,72 @@ def _key(xy: tuple[float, float] | FloatArray) -> tuple[float, float]:
     return round(float(xy[0]), _NODE_DECIMALS), round(float(xy[1]), _NODE_DECIMALS)
 
 
+# ------------------------------------------------------------------ saddles
+@dataclass(frozen=True, slots=True)
+class _Sector:
+    """The angular sector of one face around a vertex; ``face`` is None outside."""
+
+    face: int | None
+    start: int  # neighbour node bounding the sector, clockwise side
+    end: int  # neighbour node bounding the sector, counter-clockwise side
+
+
+def _resolve_saddles(
+    footprint: shapely.Polygon, faces: list[RoofFace], p: RoofParams
+) -> list[RoofFace]:
+    """Split every vertex whose faces alternate in height around it (step 5)."""
+    mesh = FaceMesh.from_faces(faces)
+    changed = False
+    for node in range(len(mesh.xy)):
+        # Each split takes one face away from the vertex, so this terminates.
+        while (sectors := mesh.sectors(node)) is not None and len(sectors) >= 4:
+            heights = [
+                -np.inf
+                if s.face is None
+                else float(plane_height(faces[s.face].plane, *mesh.xy[node, :, None])[0])
+                for s in sectors
+            ]
+            if _crossings(heights, p.height_tol_m) < 4:
+                break
+            lowest = _lowest_pit(sectors, heights, p.height_tol_m)
+            if lowest is None or not mesh.split_off(node, sectors, lowest, p.saddle_split_m):
+                break
+            changed = True
+    if not changed:
+        return faces
+    split = [RoofFace(f.plane_index, f.plane, mesh.polygon(i)) for i, f in enumerate(faces)]
+    polygons = np.array([f.polygon for f in split], dtype=object)
+    return split if _is_partition(footprint, polygons) else faces
+
+
+def _crossings(heights: list[float], tol: float) -> int:
+    """Most times any one level is crossed going once around a vertex.
+
+    Two at most for a vertex whose walls form a manifold; four or more where the
+    heights alternate.
+    """
+    finite = sorted(h for h in heights if np.isfinite(h))
+    levels = [(a + b) / 2 for a, b in pairwise(finite) if b - a > tol]
+    most = 0
+    for level in levels:
+        above = [h > level for h in heights]
+        most = max(most, sum(a != b for a, b in zip(above, above[1:] + above[:1], strict=True)))
+    return most
+
+
+def _lowest_pit(sectors: list[_Sector], heights: list[float], tol: float) -> int | None:
+    """The lowest face lower than both its neighbours around the vertex, if any."""
+    n = len(sectors)
+    pits = [
+        i
+        for i in range(n)
+        if sectors[i].face is not None
+        and heights[i] < heights[i - 1] - tol
+        and heights[i] < heights[(i + 1) % n] - tol
+    ]
+    return min(pits, key=lambda i: heights[i]) if pits else None
+
+
 # ------------------------------------------------------------------ shared nodes
 @dataclass(slots=True)
 class FaceMesh:
@@ -568,6 +648,79 @@ class FaceMesh:
         offset = abs(float(seg[0] * rel[1] - seg[1] * rel[0])) / length
         along = float(seg @ rel) / length**2
         return offset < tol and 0.0 < along < 1.0
+
+    def sectors(self, node: int) -> list[_Sector] | None:
+        """The faces around a vertex in counter-clockwise order, the outside included.
+
+        ``None`` if a face holds the vertex twice, which the split does not handle.
+        """
+        found: list[_Sector] = []
+        for f, rings in enumerate(self.rings):
+            for ring in rings:
+                hits = [i for i, n in enumerate(ring) if n == node]
+                if len(hits) > 1:
+                    return None
+                for i in hits:
+                    # Interior on the left: the face spans from the edge to the next
+                    # vertex counter-clockwise round to the edge to the previous one.
+                    found.append(_Sector(f, ring[(i + 1) % len(ring)], ring[i - 1]))
+        if not found:
+            return []
+        origin = self.xy[node]
+
+        def angle(neighbour: int) -> float:
+            d = self.xy[neighbour] - origin
+            return float(np.arctan2(d[1], d[0]))
+
+        found.sort(key=lambda s: angle(s.start))
+        ordered: list[_Sector] = []
+        for current, following in zip(found, found[1:] + found[:1], strict=True):
+            ordered.append(current)
+            if current.end != following.start:  # a gap: the outside of the footprint
+                ordered.append(_Sector(None, current.end, following.start))
+        return ordered
+
+    def split_off(self, node: int, sectors: list[_Sector], i: int, length: float) -> bool:
+        """Give sector ``i``'s face a vertex of its own, ``length`` inside it.
+
+        The faces either side of it then meet along the new edge. Returns whether the
+        split was made; it is not when it would invalidate a face.
+        """
+        sector = sectors[i]
+        before, after = sectors[i - 1], sectors[(i + 1) % len(sectors)]
+        if sector.face is None or before.face is None or after.face is None:
+            return False  # never asked for: a pit's neighbours are faces
+        origin = self.xy[node]
+        a0 = np.arctan2(*(self.xy[sector.start] - origin)[::-1])
+        a1 = np.arctan2(*(self.xy[sector.end] - origin)[::-1])
+        mid = a0 + ((a1 - a0) % (2 * np.pi)) / 2
+        reach = min(
+            length,
+            0.3 * float(np.linalg.norm(self.xy[sector.start] - origin)),
+            0.3 * float(np.linalg.norm(self.xy[sector.end] - origin)),
+        )
+        new = len(self.xy)
+        saved = [[list(r) for r in rings] for rings in self.rings]
+        self.xy = np.vstack([self.xy, origin + reach * np.array([np.cos(mid), np.sin(mid)])])
+        self._replace(sector.face, sector.end, node, sector.start, [new])
+        self._replace(before.face, sector.start, node, before.start, [new, node])
+        self._replace(after.face, after.end, node, sector.end, [node, new])
+        faces = {sector.face, before.face, after.face}
+        if all(self.polygon(f).is_valid for f in faces):
+            return True
+        self.rings = saved
+        self.xy = self.xy[:-1]
+        return False
+
+    def _replace(self, face: int, prev: int, node: int, nxt: int, by: list[int]) -> None:
+        """In ``face``, replace ``node`` where it sits between ``prev`` and ``nxt``."""
+        for ring in self.rings[face]:
+            for i, n in enumerate(ring):
+                if n == node and ring[i - 1] == prev and ring[(i + 1) % len(ring)] == nxt:
+                    ring[i : i + 1] = by
+                    return
+        msg = f"vertex {node} not found between {prev} and {nxt} in face {face}"
+        raise ValueError(msg)
 
     def boundary_nodes(self) -> set[int]:
         """Nodes on the footprint outline: on an edge with no twin."""
