@@ -168,9 +168,10 @@ def qualify_grouped(
 
     ``Groupe`` numbers are counters local to one tile file: an area spanning several
     tiles repeats them (Verdun's nine tiles repeat 88 ids), and the loader keys reference
-    buildings on ``(area, gml_id)``. Ordinary ids are globally unique UUIDs and keep
-    their form, so matching and scoring -- which exclude grouped buildings -- see no
-    change.
+    buildings on ``(area, gml_id)``. Other ids already carry their tile (Verdun's
+    ``V0100001``, ``V07_2016_01744`` and ``V01_00001`` forms) or are otherwise unique,
+    and keep their form, so matching and scoring -- which exclude grouped buildings --
+    see no change.
     """
     for building in buildings:
         if building.is_grouped and ":" not in building.gml_id:
