@@ -264,7 +264,7 @@ def data_load(
     """
     from mtl_roofs.io.footprints import load_footprints
     from mtl_roofs.io.postgis import connect, load_area
-    from mtl_roofs.io.reference import iter_buildings
+    from mtl_roofs.io.reference import iter_buildings, qualify_grouped, tile_of
 
     plan = _plan_artifacts(area)
     settings = Settings()
@@ -282,7 +282,9 @@ def data_load(
     bbox = plan.study.bbox
     (footprints_zip,) = paths["footprints"]
     footprints = load_footprints(footprints_zip, bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax))
-    buildings = (b for gml in paths["reference"] for b in iter_buildings(gml))
+    buildings = (
+        b for gml in paths["reference"] for b in qualify_grouped(iter_buildings(gml), tile_of(gml))
+    )
     with connect(settings) as conn:
         counts = load_area(conn, plan.study.name, footprints, buildings)
 

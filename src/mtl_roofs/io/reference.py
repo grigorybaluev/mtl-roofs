@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import math
 import zipfile
-from collections.abc import Iterator
-from dataclasses import dataclass, field
+from collections.abc import Iterable, Iterator
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
@@ -65,9 +65,10 @@ class ReferenceBuilding:
         """Whether this is a merged block rather than a single addressed building.
 
         The city emits merged blocks as ``Groupe<number>``; those cannot be matched
-        one-to-one against a footprint and are reported separately.
+        one-to-one against a footprint and are reported separately. A tile-qualified id
+        (``<tile>:Groupe<number>``, see :func:`qualify_grouped`) is still grouped.
         """
-        return self.gml_id.startswith("Groupe")
+        return self.gml_id.rpartition(":")[2].startswith("Groupe")
 
     def roof_area(self) -> float:
         """Total roof area in square metres."""
@@ -105,13 +106,18 @@ class ReferenceBuilding:
 def roof_outline(building: ReferenceBuilding) -> Any:  # shapely geometry; shapely is untyped
     """2D union of a building's roof surfaces: its roof outline in plan.
 
-    Degenerate (zero-area) faces are left out. A building with none left gets an empty
-    geometry.
+    Degenerate faces are left out: zero-area ones, and rings with fewer than four
+    vertices, which a closed ring cannot be (Verdun's model has some). A building with
+    none left gets an empty geometry.
     """
     import shapely
     from shapely.ops import unary_union
 
-    parts = [shapely.Polygon([p[:2] for p in r.points]).buffer(0) for r in building.roofs]
+    parts = [
+        shapely.Polygon([p[:2] for p in r.points]).buffer(0)
+        for r in building.roofs
+        if len(r.points) >= 4
+    ]
     return unary_union([p for p in parts if p.area > 0])
 
 
@@ -148,6 +154,28 @@ def parse_poslist(text: str) -> list[Point3]:
         msg = f"posList length {len(values)} is not a multiple of 3"
         raise ValueError(msg)
     return [(values[i], values[i + 1], values[i + 2]) for i in range(0, len(values), 3)]
+
+
+def tile_of(path: Path) -> str:
+    """Tile name of a reference-model file: ``V01_2016.gml`` -> ``V01``."""
+    return path.stem.split("_", 1)[0]
+
+
+def qualify_grouped(
+    buildings: Iterable[ReferenceBuilding], tile: str
+) -> Iterator[ReferenceBuilding]:
+    """Prefix ``Groupe<number>`` ids with their tile, leaving every other id untouched.
+
+    ``Groupe`` numbers are counters local to one tile file: an area spanning several
+    tiles repeats them (Verdun's nine tiles repeat 88 ids), and the loader keys reference
+    buildings on ``(area, gml_id)``. Ordinary ids are globally unique UUIDs and keep
+    their form, so matching and scoring -- which exclude grouped buildings -- see no
+    change.
+    """
+    for building in buildings:
+        if building.is_grouped and ":" not in building.gml_id:
+            building = replace(building, gml_id=f"{tile}:{building.gml_id}")
+        yield building
 
 
 def iter_buildings(path: Path) -> Iterator[ReferenceBuilding]:

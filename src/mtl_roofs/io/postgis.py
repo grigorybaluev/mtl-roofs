@@ -285,6 +285,11 @@ def load_area(
                     n_buildings += 1
                     n_grouped += building.is_grouped
                     for ordinal, roof in enumerate(building.roofs):
+                        if len(roof.points) < 4:
+                            # A closed ring needs four vertices; Verdun's model has a few
+                            # that do not (same rule as roof_outline). Skipped, not guessed;
+                            # the ordinal gap shows where one was.
+                            continue
                         surfaces.append(
                             (
                                 area,
