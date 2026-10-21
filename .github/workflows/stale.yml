@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@v11
         with:
           only-labels: "needs-decision,blocked"
           exempt-all-milestones: true
