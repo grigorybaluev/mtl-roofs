@@ -1,6 +1,7 @@
 """Command-line interface.
 
 ``mtl-roofs <command>``: ``data``, ``reconstruct``, ``evaluate``, ``export``, ``report``.
+``export`` has two subcommands: ``tiles`` (not implemented) and ``building-form``.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from mtl_roofs import CRS_EPSG, __version__
 from mtl_roofs.config import Settings, StudyArea
 from mtl_roofs.io.lidar import tile_member
 from mtl_roofs.io.reference import extract_citygml
-from mtl_roofs.io.remotezip import RemoteZip
+from mtl_roofs.io.remotezip import RemoteZip, ZipMember
 from mtl_roofs.manifest import (
     ChecksumMismatchError,
     Member,
@@ -44,6 +45,16 @@ data_app = typer.Typer(name="data", help="Fetch and verify source data.", no_arg
 app.add_typer(data_app)
 
 console = Console()
+
+#: Artefact kinds a study area resolves to; ``--only`` narrows the data commands to some.
+ARTIFACT_KINDS = ("lidar", "reference", "footprints")
+_OnlyOption = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--only",
+        help="Restrict to these artefact kinds (lidar, reference, footprints); repeatable.",
+    ),
+]
 
 
 @app.callback()
@@ -78,9 +89,10 @@ def data_areas() -> None:
 @data_app.command("plan")
 def data_plan(
     area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
+    only: _OnlyOption = None,
 ) -> None:
     """Show what `data fetch` would download for an area, without downloading it."""
-    plan = _plan_artifacts(area)
+    plan = _plan_artifacts(area, only)
     settings = Settings()
 
     table = Table("kind", "source", "artefact", "size", "pinned", title=f"fetch plan for {area}")
@@ -90,11 +102,7 @@ def data_plan(
             table.add_row(item.label, "[red]not in manifest[/red]", item.member.artifact, "-", "-")
             continue
         source = plan.sources[item.source_key]
-        size = (
-            _member_size(source.url, item.member.key, settings)
-            if source.is_archive
-            else source.size
-        )
+        size = _member_size(source.url, item, settings) if source.is_archive else source.size
         total += size or 0
         table.add_row(
             item.label,
@@ -111,6 +119,7 @@ def data_plan(
 def data_fetch(
     area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
     force: Annotated[bool, typer.Option("--force", help="Re-download existing files.")] = False,
+    only: _OnlyOption = None,
 ) -> None:
     """Download and verify every source a study area needs.
 
@@ -121,8 +130,11 @@ def data_fetch(
     Every artefact is checked against its pinned SHA-256. An existing file that fails
     verification is re-downloaded once; if it still fails, the command exits non-zero
     rather than letting a corrupt tile into the pipeline.
+
+    ``--only reference --only footprints`` skips the LiDAR, for consumers of the
+    reference model alone: a whole borough's LiDAR is tens of gigabytes.
     """
-    plan = _plan_artifacts(area)
+    plan = _plan_artifacts(area, only)
     settings = Settings()
     raw = settings.raw_dir / plan.study.name
     raw.mkdir(parents=True, exist_ok=True)
@@ -181,9 +193,10 @@ def data_fetch(
 @data_app.command("verify")
 def data_verify(
     area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
+    only: _OnlyOption = None,
 ) -> None:
     """Re-check already-downloaded artefacts against the manifest, without network."""
-    plan = _plan_artifacts(area)
+    plan = _plan_artifacts(area, only)
     raw = Settings().raw_dir / plan.study.name
 
     unpinned: list[str] = []
@@ -457,12 +470,47 @@ def evaluate(
         raise typer.Exit(code=1)
 
 
-@app.command()
-def export(
+export_app = typer.Typer(
+    name="export", help="Write data products for an area.", no_args_is_help=True
+)
+app.add_typer(export_app)
+
+
+@export_app.command("tiles")
+def export_tiles(
     area: Annotated[str, typer.Option("--area", "-a")],
 ) -> None:
     """Export a 3D Tiles tileset for the viewer."""
     raise NotImplementedError
+
+
+@export_app.command("building-form")
+def export_building_form(
+    area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
+    out: Annotated[
+        Path | None, typer.Option("--out", help="Parquet path; default data/processed/.")
+    ] = None,
+) -> None:
+    """Write one row per reference building -- outline, ground, heights, roof form.
+
+    Reads the area's CityGML tiles from data/raw/<area>/ directly; no database and no
+    LiDAR needed (`data fetch -a <area> --only reference`). See
+    `mtl_roofs.export.building_form` for the columns.
+    """
+    from mtl_roofs.export.building_form import write_building_form
+
+    plan = _plan_artifacts(area, ["reference"])
+    settings = Settings()
+    raw = settings.raw_dir / plan.study.name
+    gmls = [raw / i.member.artifact for i in plan.items]
+    missing = [g.name for g in gmls if not g.exists()]
+    if not gmls or missing:
+        console.print(f"[red]not downloaded:[/red] {', '.join(missing) or 'no reference tiles'}")
+        console.print(f"[dim]run `mtl-roofs data fetch -a {area} --only reference` first[/dim]")
+        raise typer.Exit(code=1)
+    dest = out or settings.processed_dir / plan.study.name / "building_form.parquet"
+    n = write_building_form(gmls, dest)
+    console.print(f"[bold green]{n} buildings[/bold green] from {len(gmls)} tiles -> {dest}")
 
 
 @app.command()
@@ -630,14 +678,20 @@ class _Plan:
     items: list[_Artifact]
 
 
-def _plan_artifacts(area: str) -> _Plan:
+def _plan_artifacts(area: str, only: list[str] | None = None) -> _Plan:
     """Resolve a study area to the artefacts it needs and the archives holding them.
 
     Included: the LiDAR tiles implied by the bounding box, the reference-model tiles
     named in the area config, and the footprint layer. Earlier the fetch command
     silently handled only the LiDAR, and later left out the footprints, which are
-    the pipeline's primary input.
+    the pipeline's primary input. ``only`` narrows that to some artefact kinds; an
+    unknown kind raises rather than quietly selecting nothing.
     """
+    if only:
+        unknown = sorted(set(only) - set(ARTIFACT_KINDS))
+        if unknown:
+            msg = f"unknown artefact kind(s) {unknown}; choose from {list(ARTIFACT_KINDS)}"
+            raise typer.BadParameter(msg, param_hint="--only")
     study = StudyArea.load(area)
     sources = load_manifest()
     items: list[_Artifact] = []
@@ -669,6 +723,8 @@ def _plan_artifacts(area: str) -> _Plan:
         member = Member(key=name, artifact=name, sha256=footprints.sha256, size=footprints.size)
         items.append(_Artifact(member=member, source_key=FOOTPRINTS_SOURCE, label="footprints"))
 
+    if only:
+        items = [i for i in items if i.label in only]
     return _Plan(study=study, sources=sources, items=items)
 
 
@@ -680,10 +736,10 @@ def _retrieve(item: _Artifact, source: Source, raw: Path, settings: Settings) ->
         return
 
     archive = RemoteZip(source.url, settings.user_agent)
-    zip_member = archive.member(item.member.key)
+    zip_member, nested_layout = _resolve_member(archive, item)
     console.print(f"[dim]...[/dim]   {item.member.artifact} from {source.key}")
 
-    if item.label == "lidar":
+    if not nested_layout:
         archive.extract_member(zip_member, raw / item.member.artifact)
         return
 
@@ -760,11 +816,30 @@ def _reference_archive_for(member: str, sources: Mapping[str, Source]) -> str | 
     return None
 
 
-def _member_size(url: str, fragment: str, settings: Settings) -> int | None:
+def _resolve_member(archive: RemoteZip, item: _Artifact) -> tuple[ZipMember, bool]:
+    """Find the archive member holding an artefact, and whether it is a nested ZIP.
+
+    Two reference-model layouts exist. CDN-NDG, Outremont and the Plateau hold one
+    nested ZIP per tile (``CDNNDG03.zip`` -> ``.gml`` + textures). Verdun stores each
+    tile's ``V01_2016.gml`` at the top level beside its ``V01_2016_Appearance/``
+    folder, so the tile key matches thousands of texture members while the CityGML
+    itself is directly range-readable. A top-level member named exactly like the
+    artefact wins; otherwise the member is the nested per-tile ZIP. LiDAR members
+    are always read directly.
+    """
+    if item.label == "reference":
+        direct = [m for m in archive.members() if m.name == item.member.artifact]
+        if direct:
+            return direct[0], False
+        return archive.member(item.member.key), True
+    return archive.member(item.member.key), False
+
+
+def _member_size(url: str, item: _Artifact, settings: Settings) -> int | None:
     """Compressed size of an archive member, read from the remote central directory."""
     try:
         archive = RemoteZip(url, settings.user_agent)
-        return archive.member(fragment).compressed_size
+        return _resolve_member(archive, item)[0].compressed_size
     except (KeyError, OSError):
         return None
 

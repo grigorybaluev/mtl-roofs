@@ -1,0 +1,17 @@
+# Whole-borough reference-model area for the building-form export (#91). The bbox is
+# the union of the nine tiles' own gml:Envelope, rounded outward to the metre.
+name: verdun
+borough: Verdun
+description: >-
+  All nine Verdun reference-model tiles (V01-V09), 9001 buildings, for the
+  per-building form export. The bbox implies 36 LiDAR tiles (4.87 GB of download);
+  fetch with `--only reference` unless the LiDAR is actually needed.
+epsg: 2950
+bbox:
+  xmin: 297199.0
+  ymin: 5032872.0
+  xmax: 302203.0
+  ymax: 5037180.0
+reference_tiles: [V01, V02, V03, V04, V05, V06, V07, V08, V09]
+# Measured on the first fetch (2026-10-21), as a regression check on later runs.
+expected_buildings: 9001

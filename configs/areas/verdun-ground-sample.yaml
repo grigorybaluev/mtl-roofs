@@ -1,0 +1,15 @@
+# LiDAR sample for checking the reference model's ground level in Verdun (#91).
+# Four 1 km tiles in the borough's dense centre, overlapping reference tiles V01 and
+# V05-V07. The reference buildings themselves come from the `verdun` area.
+name: verdun-ground-sample
+borough: Verdun
+description: >-
+  Four LiDAR tiles (299-300 x 5034-5035) used only to compare LiDAR ground points
+  against the reference model's lowest vertex + 3 m.
+epsg: 2950
+bbox:
+  xmin: 299000.0
+  ymin: 5034000.0
+  xmax: 300999.0
+  ymax: 5035999.0
+reference_tiles: []

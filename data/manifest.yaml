@@ -121,6 +121,15 @@ sources:
     url: https://donnees.montreal.ca/dataset/5eabd047-872e-425a-bbc2-3669e732a132/resource/2fd0e610-9e20-415b-9610-43adaa6acb57/download/pmr_2016_gml_01_11.zip
     size: 4784600000
     note: Plateau-Mont-Royal tiles 01-11. Almost entirely flat roofs.
+  lod2_2016_v_01_09:
+    kind: archive
+    url: https://donnees.montreal.ca/dataset/5eabd047-872e-425a-bbc2-3669e732a132/resource/346c9266-9f3c-4e7e-a623-8eebf5727a8c/download/v_2016_gml_01_09.zip
+    size: 1537957394
+    note: >-
+      Verdun tiles 01-09. A DIFFERENT LAYOUT from the three archives above: each
+      tile's V0n_2016.gml sits at the top level beside a V0n_2016_Appearance/ texture
+      folder, not inside a nested per-tile ZIP. The nine .gml members total 150 MB
+      compressed (1.22 GB of XML) of the 1.54 GB archive; only they are read.
 
   # ------------------------------------------------------- reference index only
   lidar2015_tile_index:

@@ -61,7 +61,8 @@ mtl-roofs data checksums -a <area>  # print the YAML to paste into data/manifest
 mtl-roofs data load -a <area>     # footprints + reference model into PostGIS (needs db-up)
 mtl-roofs reconstruct -a <area>
 mtl-roofs evaluate    -a <area>
-mtl-roofs export      -a <area>
+mtl-roofs export tiles -a <area>          # 3D Tiles (not implemented)
+mtl-roofs export building-form -a <area>  # one Parquet row per reference building
 mtl-roofs report      -a <area>
 ```
 
