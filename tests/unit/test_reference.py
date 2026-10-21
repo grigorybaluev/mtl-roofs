@@ -122,3 +122,30 @@ def test_iter_buildings_streams_a_citygml_file(tmp_path: Path) -> None:
     assert first.roof_area() == pytest.approx(12.0)
     assert first.roof_type() == "flat"
     assert math.isclose(first.roofs[0].newell_normal()[2], 1.0)
+
+
+def test_tile_qualified_groupe_ids_stay_grouped() -> None:
+    assert ReferenceBuilding("V01:Groupe152").is_grouped
+    assert not ReferenceBuilding("V01:ID_4966a1c9").is_grouped
+
+
+def test_qualify_grouped_prefixes_only_groupe_ids() -> None:
+    from pathlib import Path
+
+    from mtl_roofs.io.reference import qualify_grouped, tile_of
+
+    tile = tile_of(Path("V01_2016.gml"))
+    out = list(qualify_grouped([ReferenceBuilding("Groupe152"), ReferenceBuilding("ID_abc")], tile))
+    assert [b.gml_id for b in out] == ["V01:Groupe152", "ID_abc"]
+    assert out[0].is_grouped
+    assert not out[1].is_grouped
+    # already qualified: left alone, so re-running is idempotent
+    assert [b.gml_id for b in qualify_grouped(out, tile)] == ["V01:Groupe152", "ID_abc"]
+
+
+def test_two_tiles_no_longer_collide() -> None:
+    from mtl_roofs.io.reference import qualify_grouped
+
+    a = list(qualify_grouped([ReferenceBuilding("Groupe1")], "V01"))
+    b = list(qualify_grouped([ReferenceBuilding("Groupe1")], "V02"))
+    assert a[0].gml_id != b[0].gml_id

@@ -86,6 +86,39 @@ def test_load_writes_every_row(conn: Any) -> None:
     assert counts.roof_surfaces == sum(len(b.roofs) for b in buildings)
 
 
+def test_degenerate_rings_are_skipped_not_fatal(conn: Any) -> None:
+    """A roof ring with fewer than four vertices cannot be a closed polygon; Verdun's
+    model has a few. The load skips them instead of failing on the whole area."""
+    from mtl_roofs.io.postgis import load_area
+
+    buildings = fixture_buildings()
+    two_points = [(0.0, 0.0, 50.0), (5.0, 0.0, 50.0)]
+    buildings[0].roofs.append(RoofPolygon("degenerate-0", two_points))
+    counts = load_area(conn, TEST_AREA, fixture_footprints(), buildings)
+
+    valid = sum(1 for b in buildings for r in b.roofs if len(r.points) >= 4)
+    assert counts.roof_surfaces == count(conn, "reference_roof_surfaces") == valid
+
+
+def test_tile_local_groupe_ids_load_side_by_side(conn: Any) -> None:
+    """Two tiles each numbering a ``Groupe1`` no longer collide on (area, gml_id)."""
+    from mtl_roofs.io.postgis import load_area
+    from mtl_roofs.io.reference import qualify_grouped
+
+    square = [(0.0, 0.0, 50.0), (10.0, 0.0, 50.0), (10.0, 10.0, 50.0), (0.0, 0.0, 50.0)]
+    tiles = [
+        b
+        for tile in ("T01", "T02")
+        for b in qualify_grouped([ReferenceBuilding("Groupe1", [RoofPolygon("g", square)])], tile)
+    ]
+    load_area(conn, TEST_AREA, fixture_footprints(), tiles)
+    ids = conn.execute(
+        "SELECT gml_id FROM reference_buildings WHERE area = %s AND is_grouped ORDER BY 1",
+        (TEST_AREA,),
+    ).fetchall()
+    assert ids == [("T01:Groupe1",), ("T02:Groupe1",)]
+
+
 def test_reload_replaces_rather_than_duplicates(conn: Any) -> None:
     from mtl_roofs.io.postgis import load_area
 
