@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mtl-roofs"
-version = "0.0.0"
+version = "0.1.0"
 description = "LOD2 roof reconstruction for Montreal from open aerial LiDAR, evaluated against the city's own 3D building model"
 readme = "README.md"
 license = { file = "LICENSE" }
