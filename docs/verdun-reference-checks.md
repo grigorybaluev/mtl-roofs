@@ -58,18 +58,47 @@ around a building to about a decimetre. The wider spread against the ring median
 slope across a building's surroundings, not model error. So the exported heights are
 measured from the lowest adjacent ground, which is the conservative reading for a height
 limit. The ten largest disagreements (2.4–6.2 m) are nine where the model sits *below* the
-LiDAR and one above; six are in tile V01. The script lists them; they are not
-explained yet.
+LiDAR and one above; six are in tile V01. The script lists them, ranked by the gap to
+the ring **median**.
+
+**Explained 2026-10-21.** The nine "below" cases are not model error.
+- All nine are large, tall buildings: 26–90 m high, 700–4,300 m² footprints.
+- Each has a 3–6 m drop beside it, consistent with a sunken ramp, loading dock or terraced
+  site.
+- The model's ground matches the **lowest** ring return within about 0.2–0.6 m.
+
+The ring median sits at street level, so ranking by it surfaces exactly these sites. Their
+heights are measured from the lowest adjacent ground, as intended. Against street level
+they read 3–6 m tall, which is the conservative direction for a height limit.
+
+The one "above" case is different. `V08:Groupe33` (191 m², flat) has its ground 2.4–2.7 m
+above *every* surrounding ground return (P5 14.63 m, P95 15.10 m, model 17.21 m), while
+its roof agrees with the LiDAR to 0.4 m. Its walls were evidently not extruded 3 m below
+grade, so `+3 m` over-corrects and the height is understated by about 2.5 m. That is
+rare, measured across the 3,163 sample buildings with enough ring returns:
+
+| model ground above the lowest ring return | buildings | of which `Groupe*` |
+|---|---:|---:|
+| ≥ 0.5 m | 63 (2.0%) | 13 |
+| ≥ 1.0 m | 28 (0.9%) | 6 |
+| ≥ 2.0 m | 8 (0.25%) | 2 |
+
+The ring minimum is sensitive to a single dip, so these counts are an upper bound on true
+over-correction. It is not specific to grouped blocks. **`lod2_minus3` stands**; a
+per-building check against LiDAR, where tiles are on disk, is the remedy if a consumer
+needs it.
 
 ## 3. Two more traps found on the way
 
 - **`Groupe<n>` ids restart in every tile.** 88 ids occur in more than one tile, and 87
   of those are different buildings (different heights and footprints). Within a
   single-tile area this never shows; across a borough, `gml:id` is not a key. The export
-  qualifies every id as `<tile>:<gml:id>` and raises if that is ever not unique. **`data
-  load -a verdun` fails** on the same collision (`UniqueViolation` on
-  `reference_buildings`), because its key is `(area, gml_id)`. That is left for a
-  separate change: the evaluation's building mapping (ADR 0005) is keyed on the same id.
+  qualifies every id as `<tile>:<gml:id>` and raises if that is ever not unique. `data
+  load -a verdun` failed on the same collision (`UniqueViolation` on
+  `reference_buildings`, keyed `(area, gml_id)`). **Fixed in #93:** the loader qualifies
+  only `Groupe` ids with their tile. Other id formats already carry their tile, and
+  grouped buildings are excluded from the evaluation mapping (ADR 0005), so no score
+  moves.
 - **Four id formats coexist** in Verdun: `V0100001`-style (4,555), `V07_2016_01744`-style
   (3,738), `V01_00001`-style (182) and `Groupe…` (526). None is the numeric city id
   CDN–NDG uses.
