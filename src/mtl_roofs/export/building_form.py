@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any
 
 from mtl_roofs import CRS_EPSG, __version__
-from mtl_roofs.io.reference import ReferenceBuilding, iter_buildings, roof_outline
+from mtl_roofs.io.reference import ReferenceBuilding, iter_buildings, roof_outline, tile_of
 from mtl_roofs.manifest import sha256_file
 
 #: Reference year of the city's LOD2 model; the files were written in 2018.
@@ -108,11 +108,6 @@ def building_row(building: ReferenceBuilding, tile: str, source_sha256: str) -> 
         "source_sha256": source_sha256,
         "mtl_roofs_version": __version__,
     }
-
-
-def tile_of(gml: Path) -> str:
-    """``V01_2016.gml`` -> ``V01``."""
-    return gml.stem.split("_", 1)[0]
 
 
 def iter_rows(gmls: list[Path]) -> Iterator[dict[str, Any]]:
