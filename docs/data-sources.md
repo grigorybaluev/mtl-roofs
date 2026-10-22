@@ -178,6 +178,21 @@ recursively — `data fetch` range-streams the whole inner member and keeps only
 | `pmr_2016_gml_01_11.zip` (Plateau) | 4.78 GB | 11 | 169–770 MB |
 | `o01_2016_gml_01_03.zip` (Outremont) | 1.25 GB | 3 | 241–525 MB |
 | `cdnndg_2016_gml_01_12.zip` (CDN–NDG) | 4.25 GB | 12 | 207–521 MB |
+| `v_2016_gml_01_09.zip` (Verdun) | 1.54 GB | 9 | **flat** — see below |
+
+**Verdun is laid out differently** (checked 2026-10-21 from the archive's central
+directory). It holds no nested ZIPs: each tile's `V0n_2016.gml` sits at the top level
+beside a `V0n_2016_Appearance/` folder of JPEGs. The nine `.gml` members are 150 MB
+compressed (1.22 GB of XML) of the 1.54 GB archive, and since they are top-level members
+`data fetch` range-reads each one directly and never touches the textures. A tile key
+such as `V01` matches thousands of texture members, so a top-level member named exactly
+like the artefact is preferred over the nested-ZIP lookup.
+
+**`parcelle` is blank everywhere checked** — 9,001 of 9,001 Verdun buildings and 1,109
+of 1,109 in CDNNDG03 hold a single space. **`Groupe<n>` ids restart per tile**, so
+`gml:id` is not unique across a multi-tile area. Both are measured in
+[`verdun-reference-checks.md`](verdun-reference-checks.md), along with the ground-level
+check (lowest vertex + 3 m agrees with the LiDAR's downhill grade to 0.10 m median).
 
 ### Why 2016 and not 2020
 

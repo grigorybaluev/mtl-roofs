@@ -32,6 +32,7 @@ pyyaml = ">=6.0"
 rich = ">=13.0"
 open3d = ">=0.18"
 matplotlib-base = ">=3.8"  # figures for the failure gallery (#27)
+pyarrow = ">=25.0.0,<26"
 
 [pypi-dependencies]
 # NOTE: py3dtiles is deliberately absent. It is not on conda-forge, and on osx-64 a

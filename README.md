@@ -94,6 +94,10 @@ pixi run mtl-roofs data plan   -a cdn-ndg-03   # what would be downloaded, and w
 pixi run mtl-roofs data fetch  -a cdn-ndg-03   # ~1.07 GB, verified against the manifest
 pixi run mtl-roofs data verify -a cdn-ndg-03   # re-check what is on disk, offline
 pixi run mtl-roofs data load   -a cdn-ndg-03   # footprints + reference model into PostGIS
+
+# reference model only, no LiDAR: one row per building (outline, ground, heights, roof form)
+pixi run mtl-roofs data fetch -a verdun --only reference   # 9 tiles, ~150 MB read
+pixi run mtl-roofs export building-form -a verdun          # data/processed/verdun/building_form.parquet
 ```
 
 Every artefact is checked against a SHA-256 pinned in `data/manifest.yaml`. An existing

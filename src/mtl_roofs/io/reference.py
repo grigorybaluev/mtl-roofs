@@ -59,6 +59,10 @@ class ReferenceBuilding:
     gml_id: str
     roofs: list[RoofPolygon] = field(default_factory=list)
     attributes: dict[str, str] = field(default_factory=dict)
+    #: Lowest vertex of the whole solid (roof, walls and ground surface), or ``None``
+    #: when the building has no geometry. The walls are extruded to 3 m below grade,
+    #: so this is *not* the ground; see ``docs/verdun-reference-checks.md``.
+    solid_z_min: float | None = None
 
     @property
     def is_grouped(self) -> bool:
@@ -203,7 +207,12 @@ def iter_buildings(path: Path) -> Iterator[ReferenceBuilding]:
             attr.get("name", ""): (attr.findtext(f"{{{NS['gen']}}}value") or "")
             for attr in element.iter(f"{{{NS['gen']}}}stringAttribute")
         }
-        yield ReferenceBuilding(element.get(id_attr, ""), roofs, attributes)
+        z_min: float | None = None
+        for poslist in element.iter(poslist_tag):
+            if poslist.text and poslist.text.strip():
+                lowest = min(z for _, _, z in parse_poslist(poslist.text))
+                z_min = lowest if z_min is None else min(z_min, lowest)
+        yield ReferenceBuilding(element.get(id_attr, ""), roofs, attributes, z_min)
         element.clear()
 
 

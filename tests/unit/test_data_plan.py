@@ -91,3 +91,60 @@ def test_other_areas_still_resolve_even_though_they_are_unpinned() -> None:
         assert plan.items
         assert all(i.source_key is not None for i in plan.items)
         assert any(not i.member.is_pinned for i in plan.items)
+
+
+# ------------------------------------------------------------------ Verdun (#91)
+def test_verdun_reference_tiles_resolve_to_the_verdun_archive() -> None:
+    assert _reference_archive_for("V01", load_manifest()) == "lod2_2016_v_01_09"
+
+
+def test_only_narrows_the_plan_to_the_named_kinds() -> None:
+    plan = _plan_artifacts("verdun", ["reference"])
+    assert {i.label for i in plan.items} == {"reference"}
+    assert len(plan.items) == 9
+
+
+def test_only_rejects_an_unknown_kind() -> None:
+    import typer
+
+    with pytest.raises(typer.BadParameter, match="unknown artefact kind"):
+        _plan_artifacts("verdun", ["lidar", "textures"])
+
+
+class _FakeArchive:
+    def __init__(self, names: list[str]) -> None:
+        from mtl_roofs.io.remotezip import ZipMember
+
+        self._members = [ZipMember(n, 8, 1, 1, i) for i, n in enumerate(names)]
+
+    def members(self) -> list:  # type: ignore[type-arg]
+        return self._members
+
+    def member(self, fragment: str):  # type: ignore[no-untyped-def]
+        hits = [m for m in self._members if fragment in m.name]
+        if len(hits) != 1:
+            raise KeyError(fragment)
+        return hits[0]
+
+
+def _reference_item(tile: str):  # type: ignore[no-untyped-def]
+    from mtl_roofs.cli import _Artifact
+    from mtl_roofs.manifest import Member
+
+    return _Artifact(Member(tile, f"{tile}_2016.gml"), "src", "reference")
+
+
+def test_flat_layout_reads_the_top_level_gml_directly() -> None:
+    from mtl_roofs.cli import _resolve_member
+
+    archive = _FakeArchive(["V01_2016.gml", "V01_2016_Appearance/", "V01_2016_Appearance/a.jpg"])
+    member, nested = _resolve_member(archive, _reference_item("V01"))  # type: ignore[arg-type]
+    assert (member.name, nested) == ("V01_2016.gml", False)
+
+
+def test_nested_layout_still_reads_the_per_tile_zip() -> None:
+    from mtl_roofs.cli import _resolve_member
+
+    archive = _FakeArchive(["CDNNDG03.zip", "CDNNDG04.zip"])
+    member, nested = _resolve_member(archive, _reference_item("CDNNDG03"))  # type: ignore[arg-type]
+    assert (member.name, nested) == ("CDNNDG03.zip", True)

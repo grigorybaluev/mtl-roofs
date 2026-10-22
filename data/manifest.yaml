@@ -121,6 +121,55 @@ sources:
     url: https://donnees.montreal.ca/dataset/5eabd047-872e-425a-bbc2-3669e732a132/resource/2fd0e610-9e20-415b-9610-43adaa6acb57/download/pmr_2016_gml_01_11.zip
     size: 4784600000
     note: Plateau-Mont-Royal tiles 01-11. Almost entirely flat roofs.
+  lod2_2016_v_01_09:
+    kind: archive
+    url: https://donnees.montreal.ca/dataset/5eabd047-872e-425a-bbc2-3669e732a132/resource/346c9266-9f3c-4e7e-a623-8eebf5727a8c/download/v_2016_gml_01_09.zip
+    size: 1537957394
+    note: >-
+      Verdun tiles 01-09. A DIFFERENT LAYOUT from the three archives above: each
+      tile's V0n_2016.gml sits at the top level beside a V0n_2016_Appearance/ texture
+      folder, not inside a nested per-tile ZIP. The nine .gml members total 150 MB
+      compressed (1.22 GB of XML) of the 1.54 GB archive; only they are read.
+    members:
+      # Same layout note as above: the checksum is over each extracted top-level
+      # V0n_2016.gml. Re-derived 2026-10-21 and matching the values computed
+      # independently in #92.
+      V01:
+        artifact: V01_2016.gml
+        sha256: "803a2250abbb2545de722273bb1c8ac536d226c1dfc8b7d7e681d748a51e04af"
+        size: 157611028
+      V02:
+        artifact: V02_2016.gml
+        sha256: "4498a65615fd190b8e819fb05441833bc791d0cbb7a90d6e57e067ea4a5de8f3"
+        size: 81959338
+      V03:
+        artifact: V03_2016.gml
+        sha256: "664bbf027b95404364913db75db1ac7382b180789c48db3c61bc71dc8f9a3e70"
+        size: 125687224
+      V04:
+        artifact: V04_2016.gml
+        sha256: "b4c951f09866c80cdfbeea49682607d52413b2db2b6400c19a00d8f4612c2d7f"
+        size: 114438008
+      V05:
+        artifact: V05_2016.gml
+        sha256: "cbbbbb8cc5e2038f39ed66ff85ba568a44175e2555f1c8f624712dcc9908a5a7"
+        size: 220274672
+      V06:
+        artifact: V06_2016.gml
+        sha256: "3d09720bdaef1f6893bb599fa2b157e2d49c8ca750616e9feb158b301619d056"
+        size: 112594144
+      V07:
+        artifact: V07_2016.gml
+        sha256: "f60c94ddcaca4b2e4c4920c91783b705bc20753a7ccee492adecb5204e4b5dbb"
+        size: 216959406
+      V08:
+        artifact: V08_2016.gml
+        sha256: "03a22406e2d57db7726b4eb9a94cba78320082fdb8fe57d86267fb60e0c371b8"
+        size: 117804596
+      V09:
+        artifact: V09_2016.gml
+        sha256: "9a927598bb04b6f99f0ddf77616f8d697a4caa7d3bcac0c29f252c51bc1aa1c0"
+        size: 76815368
 
   # ------------------------------------------------------- reference index only
   lidar2015_tile_index:
