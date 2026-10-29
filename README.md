@@ -23,7 +23,11 @@ the height difference on the 0.5 m evaluation grid (red: reconstruction too high
 blue: too low).*
 
 **Status:** the classical pipeline and the evaluation are complete for the v0 study
-area; the web viewer is in progress ([#28](https://github.com/grigorybaluev/mtl-roofs/issues/28)).
+area, and the **[web viewer](https://grigorybaluev.github.io/mtl-roofs/)** shows all of
+it: every reconstruction, the failures, the city's model and the LiDAR, coloured by
+error, with each building's metrics a click away.
+
+[![The web viewer, coloured by error, with one footprint selected](docs/img/viewer.png)](https://grigorybaluev.github.io/mtl-roofs/)
 
 ## Results
 
@@ -80,6 +84,7 @@ Every number above comes from these commands, after the Quickstart below:
 mtl-roofs reconstruct -a cdn-ndg-03   # every footprint, with its status, into PostGIS (~14 min)
 mtl-roofs evaluate    -a cdn-ndg-03   # every reference building scored
 mtl-roofs report      -a cdn-ndg-03   # breakdown tables and the failure gallery
+mtl-roofs export-scene -a cdn-ndg-03  # the viewer's scene (released as viewer-data-*.zip)
 ```
 
 They write to `data/processed/cdn-ndg-03/`: `reconstructions.csv` and `buildings.csv`
@@ -235,8 +240,7 @@ attribution.
 ## Scope
 
 - **v0 — "one neighbourhood, honest numbers":** one neighbourhood, classical pipeline
-  only, full evaluation report, viewer deployed. Pipeline and evaluation are done; the
-  viewer is in progress.
+  only, full evaluation report, viewer deployed. Done.
 - **v1 — "ML + borough scale":** ML roof typing with ablations against the classical
   pipeline on identical metrics, scaled to a full borough.
 

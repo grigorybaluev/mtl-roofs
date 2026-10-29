@@ -47,3 +47,6 @@ htmlcov/
 *.swp
 .idea/
 .vscode/
+
+# viewer scene data (mtl-roofs export-scene), served from a release asset
+viewer/public/data/

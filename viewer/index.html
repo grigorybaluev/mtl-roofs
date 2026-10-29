@@ -4,22 +4,46 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mtl-roofs — LOD2 roof reconstruction for Montréal</title>
+    <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
     <div id="app">
-      <canvas id="scene"></canvas>
+      <div id="stage">
+        <canvas id="scene"></canvas>
+        <p id="status">Loading the scene …</p>
+        <p id="hint">Drag to orbit · right-drag to pan · scroll to zoom · click a building</p>
+      </div>
       <aside id="panel">
         <h1>mtl-roofs</h1>
-        <p class="sub">LOD2 roof reconstruction · CDN–NDG</p>
+        <p class="sub">
+          LOD2 roofs rebuilt from 2015 LiDAR and footprints, scored against the city's
+          2016 3D model · CDN–NDG ·
+          <a href="https://github.com/grigorybaluev/mtl-roofs">code</a>
+        </p>
+        <div id="summary"></div>
         <fieldset id="layers">
           <legend>Layers</legend>
-          <label><input type="checkbox" data-layer="points" checked /> LiDAR points</label>
-          <label><input type="checkbox" data-layer="reconstruction" checked /> Reconstruction</label>
-          <label><input type="checkbox" data-layer="reference" /> Reference model</label>
-          <label><input type="checkbox" data-layer="error" /> Error colouring</label>
+          <label><input type="checkbox" data-layer="points" checked disabled /> LiDAR points</label>
+          <p class="note layer-note">Roof returns show when both models are off.</p>
+          <label><input type="checkbox" data-layer="reconstruction" checked disabled /> Reconstruction</label>
+          <label><input type="checkbox" data-layer="reference" disabled /> City model (roofs)</label>
+          <label><input type="checkbox" data-layer="error" disabled /> Colour by error</label>
         </fieldset>
-        <div id="metrics" class="empty">Select a building to see its metrics.</div>
+        <div id="legend">
+          <div class="plain">
+            <span><i style="background: #ece6da"></i>our roofs</span>
+            <span><i style="background: #a7a196"></i>our walls</span>
+            <span><i style="background: #e3894a"></i>city roofs</span>
+            <span><i style="background: #e5484d"></i>not reconstructed</span>
+          </div>
+          <div class="ramp">
+            <div class="bar"></div>
+            <div class="ticks"><span>0</span><span>0.5</span><span>1.0</span><span>≥ 1.5 m</span></div>
+            <span><i style="background: #7d8494"></i>not scored (no city building)</span>
+          </div>
+        </div>
+        <div id="metrics" class="empty">Click a building to see its metrics.</div>
         <footer>
           Data © Ville de Montréal, CC BY 4.0.
           Portions © Communauté métropolitaine de Montréal.

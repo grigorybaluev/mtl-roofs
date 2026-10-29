@@ -7,8 +7,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
-    // 3D Tiles payloads are fetched at runtime from the release asset bundle,
-    // never inlined, so the JS bundle stays small.
+    // The scene is fetched at runtime from the release asset, never bundled.
     assetsInlineLimit: 4096,
+    // three.js alone is ~550 kB minified; one chunk is fine for a single-page viewer
+    chunkSizeWarningLimit: 700,
   },
 });
