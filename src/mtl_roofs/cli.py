@@ -465,6 +465,43 @@ def export(
     raise NotImplementedError
 
 
+@app.command("export-scene")
+def export_scene(
+    area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Output directory; default data/processed/<area>/viewer."),
+    ] = None,
+) -> None:
+    """Write the v0 viewer's static scene: scene.json and scene.bin.
+
+    Reads the stored reconstructions and evaluation rows, so run `reconstruct -a` and
+    `evaluate -a` first. Zip the output as `viewer-data-<area>.zip` and attach it to a
+    release; the pages workflow serves it next to the viewer.
+    """
+    from mtl_roofs.batch import lidar_paths
+    from mtl_roofs.export.scene import build_scene
+    from mtl_roofs.io.postgis import connect
+
+    study = StudyArea.load(area)
+    settings = Settings()
+    target = out or settings.processed_dir / area / "viewer"
+    tiles = lidar_paths(settings.raw_dir / study.name, study.bbox.lidar_tiles())
+    with connect(settings) as conn, console.status("building the scene ..."):
+        try:
+            index = build_scene(conn, area, tiles, target)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(code=1) from e
+    size = (target / "scene.bin").stat().st_size / 1e6
+    counts = {k: v["length"] for k, v in index["arrays"].items()}
+    console.print(
+        f"wrote {target} ({size:.1f} MB): {counts['rec_owner']:,} reconstruction, "
+        f"{counts['ref_owner']:,} reference, {counts['pad_owner']:,} pad triangles; "
+        f"{counts['pts_class']:,} points"
+    )
+
+
 @app.command()
 def report(
     area: Annotated[str, typer.Option("--area", "-a", help="Study area name.")],

@@ -62,6 +62,7 @@ mtl-roofs data load -a <area>     # footprints + reference model into PostGIS (n
 mtl-roofs reconstruct -a <area>
 mtl-roofs evaluate    -a <area>
 mtl-roofs export      -a <area>
+mtl-roofs export-scene -a <area>  # the viewer's static scene, data/processed/<area>/viewer
 mtl-roofs report      -a <area>
 ```
 
@@ -117,7 +118,7 @@ When a choice has a real alternative someone could reasonably prefer, write an A
 maintainer confirms. Do not implement past an unresolved ADR. Accepted ADRs are
 immutable — supersede, never edit.
 
-Currently open: `0002` (3D Tiles writer), `0003` (Three.js vs CesiumJS).
+Currently open: `0002` (3D Tiles writer; v0 ships a static scene instead, see `0003`).
 
 ## Evaluation is sacred
 

@@ -1,7 +1,7 @@
 # 0003. Viewer renderer: Three.js or CesiumJS
 
-- **Status:** proposed — blocks the "Viewer" and "3D Tiles export" issues
-- **Date:** 2026-09-22
+- **Status:** accepted (A, for v0) · proposed 2026-09-22
+- **Date:** 2026-10-29
 
 ## Context
 
@@ -34,18 +34,23 @@ gradients is more constrained than a custom shader.
 
 ## Decision
 
-**Not yet decided.** The trade-off turns on v1: if borough scale is a firm goal, B's
-native tiling pays for itself and settles [0002](0002-3d-tiles-writer.md) toward a
-conformant tileset. If v0's honest evaluation is the point and v1 scale is aspirational,
-A is lighter and better at the error visualisation that is the whole reason for the
-viewer.
+**A, Three.js, for v0.** Confirmed by the maintainer on 2026-10-29.
 
-Note the interaction: choosing A makes B-in-0002 ("write the tileset ourselves") more
-attractive, since we would control both ends and could keep the format minimal.
+v0's point is the honest evaluation, and the viewer exists to show it: per-building error,
+the failures, and the reference next to the reconstruction. The v0 area is small enough to
+ship whole (about 15 MB for 1,556 footprints, 39k reference triangles and a 1.5 M-point
+LiDAR sample), so A's missing tiling costs nothing yet. B's advantages only pay off at
+borough scale, which is v1.
+
+v0 therefore does not use 3D Tiles at all: `mtl-roofs export-scene` writes a minimal
+static scene (`scene.json` + `scene.bin`, documented in `src/mtl_roofs/export/scene.py`)
+that the viewer loads in one request. This leaves [0002](0002-3d-tiles-writer.md) open
+rather than deciding it by accident; it becomes the v1 question, together with revisiting
+this ADR if a borough does not fit in one scene.
 
 ## Consequences
 
-`viewer/` currently has a framework-free TypeScript scaffold — `three` is declared but
-the scene is not built — so neither option is foreclosed. The "ADR: Three.js vs
-CesiumJS" issue carries `needs-decision`, and the viewer issue stays blocked until
-this is resolved.
+- The viewer is Three.js with OrbitControls, framework-free TypeScript, as scaffolded.
+- Hosting is a release asset: the scene is zipped as `viewer-data-<area>.zip`, attached to
+  a GitHub release, and copied next to the viewer by `pages.yml`. No data enters git.
+- At v1 scale this ADR is to be superseded, not edited, if one scene no longer fits.
